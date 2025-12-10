@@ -31,12 +31,15 @@ Components:
     - ProviderManager: Provider configuration and discovery
     - ModuleManager: Module configuration (tools, hooks, agents, etc.)
     - SessionStore: Session persistence with atomic writes
+    - SessionSpawner: Agent delegation and sub-session management
     - KeyManager: Secure API key storage
     - AppSettings: High-level settings helpers
+    - ConfigResolver: Configuration assembly with precedence
     - Various utilities for mentions, projects, and provider sources
 """
 
 from .app_settings import AppSettings, ScopeType
+from .config_resolver import deep_merge, expand_env_vars, resolve_app_config
 from .effective_config import EffectiveConfigSummary, get_effective_config_summary
 from .key_manager import KeyManager
 from .module_manager import (
@@ -57,6 +60,7 @@ from .provider_sources import (
     is_local_path,
     source_from_uri,
 )
+from .session_spawner import merge_agent_configs, resume_sub_session, spawn_sub_session
 from .session_store import SessionStore
 
 __version__ = "0.1.0"
@@ -96,6 +100,13 @@ __all__ = [
     "get_effective_config_summary",
     # Session management
     "SessionStore",
+    "spawn_sub_session",
+    "resume_sub_session",
+    "merge_agent_configs",
+    # Config resolution
+    "resolve_app_config",
+    "deep_merge",
+    "expand_env_vars",
     # Project utilities
     "get_project_slug",
     # Key management
