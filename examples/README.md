@@ -15,18 +15,7 @@ The simplest possible Amplifier application. Demonstrates the absolute minimum c
 - Session creation
 - Basic REPL loop
 
-### 2. API Server (`api_server.py`)
-
-A FastAPI-based REST API for Amplifier. Shows how to build a stateless API service.
-
-**Lines of Code:** ~80  
-**Key Concepts:**
-- Stateless session management
-- Request/response handling
-- Configuration injection
-- Error handling
-
-### 3. Agent Delegation (`agent_delegation.py`)
+### 2. Agent Delegation (`agent_delegation.py`)
 
 Demonstrates using the session spawner for multi-agent workflows.
 
@@ -37,7 +26,7 @@ Demonstrates using the session spawner for multi-agent workflows.
 - Multi-turn conversations
 - Session persistence
 
-### 4. Custom Provider (`custom_provider.py`)
+### 3. Custom Provider (`custom_provider.py`)
 
 Shows how to configure and use providers with the foundation.
 
@@ -54,11 +43,11 @@ Shows how to configure and use providers with the foundation.
 
 ```bash
 # Install the foundation library
-cd amplifier-foundation
+cd amplifier-app-utils
 uv pip install -e .
 
 # Or install from PyPI (once published)
-uv pip install amplifier-foundation
+uv pip install amplifier-app-utils
 ```
 
 ### Run an Example
@@ -66,9 +55,6 @@ uv pip install amplifier-foundation
 ```bash
 # Minimal REPL
 uv run python examples/minimal_repl.py
-
-# API Server
-uv run python examples/api_server.py
 
 # Agent Delegation
 uv run python examples/agent_delegation.py
@@ -116,10 +102,10 @@ await session.initialize()
 
 ## Architecture Benefits
 
-1. **Single Dependency** - Just `amplifier-foundation` instead of 5 packages
+1. **Single Dependency** - Just `amplifier-app-utils` instead of 5 packages
 2. **Zero Boilerplate** - Path management, config resolution, providers all handled
 3. **Type Safe** - Full type hints for IDE support
-4. **Well Tested** - 111 tests ensure reliability
+4. **Well Tested** - 111 tests with 100% pass rate ensure reliability
 5. **Flexible** - Easy to customize for any use case
 
 ## Next Steps

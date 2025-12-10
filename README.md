@@ -46,7 +46,7 @@ await session.initialize()
 ### Installation
 
 ```bash
-pip install amplifier-foundation
+pip install amplifier-app-utils
 ```
 
 ### Build a Minimal App
@@ -97,13 +97,13 @@ See [examples/](examples/) for complete working applications.
 | **Effective Config** | Display-friendly config summaries | 110 | 9 |
 | **Session Spawner** | Agent delegation (sub-sessions) | 350 | 9 |
 | **Config Resolver** | Complete config resolution pipeline | 200 | 9 |
-| **TOTAL** | | **3,070** | **103** |
+| **TOTAL** | | **3,070** | **111** |
 
 ### Features
 
 ✅ **Zero Boilerplate** - One import, ~25 lines to get started  
 ✅ **Dependency Injection** - PathManager provides factories for all core objects  
-✅ **Battle-Tested** - Extracted from production CLI with 103 passing tests  
+✅ **Battle-Tested** - Extracted from production CLI with 111 passing tests  
 ✅ **Type-Safe** - Full type hints with mypy compatibility  
 ✅ **Well-Documented** - Every module has comprehensive docstrings  
 ✅ **Cross-Platform** - Windows, macOS, Linux support  
@@ -178,8 +178,8 @@ print(DEFAULT_PROVIDER_SOURCES["provider-anthropic"])
 
 # Manage providers
 pm = ProviderManager(config_manager)
-pm.use("anthropic", scope="global")
-pm.list_providers()
+pm.use_provider("provider-anthropic", scope="global")
+print(pm.get_current_provider())
 pm.reset_provider(scope="project")
 ```
 
@@ -236,13 +236,13 @@ content = await loader.load_mentions(mentions, max_depth=3)
 Run the test suite:
 
 ```bash
-git clone https://github.com/microsoft/amplifier-foundation
-cd amplifier-foundation
+git clone https://github.com/microsoft/amplifier-app-utils
+cd amplifier-app-utils
 uv sync
 uv run pytest tests/ -v
 ```
 
-**Current status:** 103 tests, 93% pass rate ✅
+**Current status:** 111 tests, 100% pass rate ✅
 
 ## 📖 Documentation
 
@@ -311,8 +311,8 @@ Contributions welcome! This library is extracted from production CLI code, so ch
 ### Development Setup
 
 ```bash
-git clone https://github.com/microsoft/amplifier-foundation
-cd amplifier-foundation
+git clone https://github.com/microsoft/amplifier-app-utils
+cd amplifier-app-utils
 uv sync --dev
 uv run pytest tests/ -v
 ```
@@ -325,11 +325,11 @@ uv run pytest tests/ -v
 | Provider Management | ✅ Complete | 100% |
 | Session Management | ✅ Complete | 100% |
 | Module Management | ✅ Complete | 100% |
-| Testing | 🟢 Good | 93% |
+| Testing | ✅ Complete | 100% |
 | Documentation | ✅ Complete | 100% |
 | PyPI Publication | ⏸️ Planned | 0% |
 
-**Overall Progress:** ~85% complete
+**Overall Progress:** ~95% complete
 
 ## 📄 License
 
@@ -342,7 +342,7 @@ Extracted from [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cl
 ---
 
 **Status:** Beta - Production Ready  
-**Test Coverage:** 103 tests, 93% pass rate  
+**Test Coverage:** 111 tests, 100% pass rate  
 **Python:** 3.11+  
 **Platform:** Windows, macOS, Linux  
 **Used By:** amplifier-app-cli

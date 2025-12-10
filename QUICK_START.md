@@ -4,10 +4,10 @@
 
 ```bash
 # Once published to PyPI:
-pip install amplifier-foundation
+pip install amplifier-app-utils
 
 # For now (development):
-cd amplifier-foundation
+cd amplifier-app-utils
 pip install -e .
 ```
 
