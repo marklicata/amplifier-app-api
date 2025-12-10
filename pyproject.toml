@@ -1,7 +1,7 @@
 [project]
-name = "amplifier-foundation"
+name = "amplifier-app-utils"
 version = "0.1.0"
-description = "Common foundation library for building Amplifier applications"
+description = "Common utility library for building Amplifier applications"
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.11"
