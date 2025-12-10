@@ -163,15 +163,21 @@ def test_get_scope_provider_overrides_empty(app_settings, mock_config):
 @patch("amplifier_app_utils.app_settings.DEFAULT_PROVIDER_SOURCES")
 def test_apply_provider_overrides_to_profile(mock_sources, app_settings, mock_config):
     """Test applying provider overrides to profile."""
-    from amplifier_profiles.schema import Profile, ModuleConfig
+    from amplifier_profiles.schema import Profile, ModuleConfig, ProfileMetadata, SessionConfig
     
     mock_sources.get.return_value = "git+https://example.com/provider-test"
     
     # Create base profile with one provider - include required fields
     profile = Profile(
-        name="test-profile",
-        profile={},  # Required field
-        session={},  # Required field
+        profile=ProfileMetadata(
+            name="test-profile",
+            version="1.0.0",
+            description="Test profile"
+        ),
+        session=SessionConfig(
+            orchestrator=ModuleConfig(module="test-orchestrator"),
+            context=ModuleConfig(module="test-context")
+        ),
         providers=[
             ModuleConfig(module="provider-test", config={"model": "base-model"})
         ]
@@ -193,15 +199,21 @@ def test_apply_provider_overrides_to_profile(mock_sources, app_settings, mock_co
 @patch("amplifier_app_utils.app_settings.DEFAULT_PROVIDER_SOURCES")
 def test_apply_provider_overrides_adds_new_provider(mock_sources, app_settings, mock_config):
     """Test that applying overrides can add new providers."""
-    from amplifier_profiles.schema import Profile, ModuleConfig
+    from amplifier_profiles.schema import Profile, ModuleConfig, ProfileMetadata, SessionConfig
     
     mock_sources.get.return_value = "git+https://example.com/provider-new"
     
     # Create base profile with one provider - include required fields
     profile = Profile(
-        name="test-profile",
-        profile={},  # Required field
-        session={},  # Required field
+        profile=ProfileMetadata(
+            name="test-profile",
+            version="1.0.0",
+            description="Test profile"
+        ),
+        session=SessionConfig(
+            orchestrator=ModuleConfig(module="test-orchestrator"),
+            context=ModuleConfig(module="test-context")
+        ),
         providers=[
             ModuleConfig(module="provider-existing", config={"model": "existing"})
         ]
@@ -223,13 +235,19 @@ def test_apply_provider_overrides_adds_new_provider(mock_sources, app_settings, 
 
 def test_apply_provider_overrides_no_overrides(app_settings):
     """Test applying overrides when there are none."""
-    from amplifier_profiles.schema import Profile, ModuleConfig
+    from amplifier_profiles.schema import Profile, ModuleConfig, ProfileMetadata, SessionConfig
     
     # Create profile with required fields
     profile = Profile(
-        name="test-profile",
-        profile={},  # Required field
-        session={},  # Required field
+        profile=ProfileMetadata(
+            name="test-profile",
+            version="1.0.0",
+            description="Test profile"
+        ),
+        session=SessionConfig(
+            orchestrator=ModuleConfig(module="test-orchestrator"),
+            context=ModuleConfig(module="test-context")
+        ),
         providers=[
             ModuleConfig(module="provider-test", config={"model": "base-model"})
         ]

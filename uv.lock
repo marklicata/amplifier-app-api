@@ -3,35 +3,7 @@ revision = 3
 requires-python = ">=3.11"
 
 [[package]]
-name = "amplifier-collections"
-version = "0.1.0"
-source = { git = "https://github.com/microsoft/amplifier-collections?branch=main#694daf5433cf372843a25466f820217c37f3043e" }
-dependencies = [
-    { name = "pydantic" },
-]
-
-[[package]]
-name = "amplifier-config"
-version = "0.1.0"
-source = { git = "https://github.com/microsoft/amplifier-config?branch=main#78c0db75bc27b5136d18d346f0e3c6ae7c2ec985" }
-dependencies = [
-    { name = "pyyaml" },
-]
-
-[[package]]
-name = "amplifier-core"
-version = "1.0.0"
-source = { git = "https://github.com/microsoft/amplifier-core?branch=main#30f9ff44604ae05bfeeec37928689d93731286dc" }
-dependencies = [
-    { name = "click" },
-    { name = "pydantic" },
-    { name = "pyyaml" },
-    { name = "tomli" },
-    { name = "typing-extensions" },
-]
-
-[[package]]
-name = "amplifier-foundation"
+name = "amplifier-app-utils"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -65,6 +37,34 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
+]
+
+[[package]]
+name = "amplifier-collections"
+version = "0.1.0"
+source = { git = "https://github.com/microsoft/amplifier-collections?branch=main#694daf5433cf372843a25466f820217c37f3043e" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[[package]]
+name = "amplifier-config"
+version = "0.1.0"
+source = { git = "https://github.com/microsoft/amplifier-config?branch=main#78c0db75bc27b5136d18d346f0e3c6ae7c2ec985" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[[package]]
+name = "amplifier-core"
+version = "1.0.0"
+source = { git = "https://github.com/microsoft/amplifier-core?branch=main#30f9ff44604ae05bfeeec37928689d93731286dc" }
+dependencies = [
+    { name = "click" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "tomli" },
+    { name = "typing-extensions" },
 ]
 
 [[package]]
