@@ -18,7 +18,7 @@ pip install -e .
 
 import asyncio
 from amplifier_core import AmplifierSession
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 
 
 async def main():
@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
 ### Path Management ✅
 ```python
-from amplifier_foundation import PathManager
+from amplifier_app_utils import PathManager
 
 pm = PathManager(app_name="my-app")
 print(pm.user_config_dir)    # ~/.config/my-app (Linux/Mac)
@@ -65,7 +65,7 @@ print(pm.keys_file)           # ~/.amplifier/keys.env
 
 ### Provider Management ✅
 ```python
-from amplifier_foundation import ProviderManager
+from amplifier_app_utils import ProviderManager
 
 mgr = ProviderManager(config_manager)
 mgr.use_provider(
@@ -77,7 +77,7 @@ mgr.use_provider(
 
 ### Session Persistence ✅
 ```python
-from amplifier_foundation import SessionStore
+from amplifier_app_utils import SessionStore
 
 store = SessionStore()
 store.save("my-session", messages, metadata)
@@ -86,7 +86,7 @@ messages, metadata = store.load("my-session")
 
 ### Agent Delegation ✅
 ```python
-from amplifier_foundation import spawn_sub_session
+from amplifier_app_utils import spawn_sub_session
 
 result = await spawn_sub_session(
     agent_name="researcher",
@@ -102,7 +102,7 @@ print(result["session_id"])  # For multi-turn
 
 ### Key Management ✅
 ```python
-from amplifier_foundation import KeyManager
+from amplifier_app_utils import KeyManager
 
 keys = KeyManager()
 keys.save_key("anthropic", "sk-ant-...")
@@ -111,7 +111,7 @@ print(keys.has_key("anthropic"))  # True
 
 ### Configuration Resolution ✅
 ```python
-from amplifier_foundation import resolve_app_config
+from amplifier_app_utils import resolve_app_config
 
 config = resolve_app_config(
     config_manager=config_mgr,
@@ -161,7 +161,7 @@ async def repl():
 
 ```python
 from fastapi import FastAPI
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 
 app = FastAPI()
 pm = PathManager(app_name="my-api")
@@ -180,7 +180,7 @@ async def chat(message: str):
 
 ```python
 from PyQt6.QtWidgets import QApplication, QMainWindow
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 
 class MainWindow(QMainWindow):
     def __init__(self):

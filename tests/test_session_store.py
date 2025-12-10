@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from amplifier_foundation.session_store import SessionStore
+from amplifier_app_utils.session_store import SessionStore
 
 
 @pytest.fixture

@@ -92,7 +92,7 @@ Building an Amplifier app required 500+ lines of boilerplate:
 
 Building an Amplifier app requires ~25 lines:
 ```python
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 from amplifier_core import AmplifierSession
 
 pm = PathManager(app_name="my-app")

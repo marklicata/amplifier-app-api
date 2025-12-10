@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from amplifier_foundation.project_utils import get_project_slug
+from amplifier_app_utils.project_utils import get_project_slug
 
 
 def test_get_project_slug():

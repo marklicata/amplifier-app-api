@@ -53,7 +53,7 @@ class ModuleManager:
     
     Example:
         ```python
-        from amplifier_foundation import PathManager, ModuleManager
+        from amplifier_app_utils import PathManager, ModuleManager
         
         pm = PathManager(app_name="my-app")
         config = pm.create_config_manager()

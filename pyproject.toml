@@ -20,7 +20,7 @@ dependencies = [
 package = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["amplifier_foundation"]
+packages = ["amplifier_app_utils"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

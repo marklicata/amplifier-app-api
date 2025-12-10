@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock
 from pathlib import Path
 from amplifier_config import Scope
-from amplifier_foundation.module_manager import ModuleManager, AddModuleResult
+from amplifier_app_utils.module_manager import ModuleManager, AddModuleResult
 
 
 @pytest.fixture

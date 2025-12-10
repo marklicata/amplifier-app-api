@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from amplifier_foundation.provider_manager import (
+from amplifier_app_utils.provider_manager import (
     ProviderManager,
     ProviderInfo,
     ConfigureResult,
@@ -46,7 +46,7 @@ def test_use_provider_with_explicit_source(provider_manager, mock_config):
     assert result.config == {"model": "test-model"}
 
 
-@patch("amplifier_foundation.provider_manager.get_effective_provider_sources")
+@patch("amplifier_app_utils.provider_manager.get_effective_provider_sources")
 def test_use_provider_with_effective_source(mock_get_sources, provider_manager, mock_config):
     """Test configuring provider using effective sources."""
     mock_get_sources.return_value = {

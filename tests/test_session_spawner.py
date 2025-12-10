@@ -1,7 +1,7 @@
 """Tests for session spawner module."""
 
 import pytest
-from amplifier_foundation.session_spawner import (
+from amplifier_app_utils.session_spawner import (
     _generate_sub_session_id,
     merge_agent_configs,
 )

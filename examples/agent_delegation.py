@@ -12,7 +12,7 @@ Usage:
 import asyncio
 
 from amplifier_core import AmplifierSession
-from amplifier_foundation import (
+from amplifier_app_utils import (
     PathManager,
     SessionStore,
     resolve_app_config,
@@ -72,7 +72,7 @@ async def main():
 
     # Example 2: Multi-turn conversation (resume session)
     print(f"🔄 Continuing conversation with '{agent_name}'...")
-    from amplifier_foundation import resume_sub_session
+    from amplifier_app_utils import resume_sub_session
 
     result2 = await resume_sub_session(
         sub_session_id=result["session_id"],

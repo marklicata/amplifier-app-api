@@ -65,7 +65,7 @@ class ProviderManager:
     
     Example:
         ```python
-        from amplifier_foundation import PathManager, ProviderManager
+        from amplifier_app_utils import PathManager, ProviderManager
         
         pm = PathManager(app_name="my-app")
         config = pm.create_config_manager()

@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from amplifier_foundation.paths import PathManager
+from amplifier_app_utils.paths import PathManager
 
 
 def test_path_manager_defaults():

@@ -3,7 +3,7 @@
 import os
 
 import pytest
-from amplifier_foundation.config_resolver import (
+from amplifier_app_utils.config_resolver import (
     deep_merge,
     expand_env_vars,
 )

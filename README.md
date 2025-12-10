@@ -20,7 +20,7 @@ from amplifier_module_resolution import ModuleResolver
 
 **After Foundation:**
 ```python
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 from amplifier_core import AmplifierSession
 
 pm = PathManager(app_name="my-app")
@@ -52,7 +52,7 @@ pip install amplifier-foundation
 ### Build a Minimal App
 
 ```python
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 from amplifier_core import AmplifierSession
 
 # Setup
@@ -133,7 +133,7 @@ The foundation handles all the complexity of coordinating these dependencies, pr
 The central hub for all Amplifier paths and factories:
 
 ```python
-from amplifier_foundation import PathManager
+from amplifier_app_utils import PathManager
 
 # Create with custom app name
 pm = PathManager(app_name="my-app")
@@ -155,7 +155,7 @@ print(pm.session_dir)  # ~/.amplifier/projects/<slug>/sessions/
 Complete pipeline from settings to runtime config:
 
 ```python
-from amplifier_foundation import resolve_app_config
+from amplifier_app_utils import resolve_app_config
 
 config = resolve_app_config(
     config_manager=config_mgr,
@@ -170,7 +170,7 @@ config = resolve_app_config(
 ### Provider Management
 
 ```python
-from amplifier_foundation import ProviderManager, DEFAULT_PROVIDER_SOURCES
+from amplifier_app_utils import ProviderManager, DEFAULT_PROVIDER_SOURCES
 
 # Get canonical sources
 print(DEFAULT_PROVIDER_SOURCES["provider-anthropic"])
@@ -186,7 +186,7 @@ pm.reset_provider(scope="project")
 ### Session Management
 
 ```python
-from amplifier_foundation import SessionStore, SessionSpawner
+from amplifier_app_utils import SessionStore, SessionSpawner
 
 # Persistence
 store = SessionStore()
@@ -205,7 +205,7 @@ child_id = spawner.spawn_session(
 ### Key Management
 
 ```python
-from amplifier_foundation import KeyManager
+from amplifier_app_utils import KeyManager
 
 km = KeyManager()
 km.save_key("ANTHROPIC_API_KEY", "sk-ant-...")
@@ -216,7 +216,7 @@ km.get_configured_provider()  # => "anthropic"
 ### Mention Loading
 
 ```python
-from amplifier_foundation.mention_loading import (
+from amplifier_app_utils.mention_loading import (
     parse_mentions,
     MentionResolver,
     ContentLoader,
@@ -261,7 +261,7 @@ See [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli) for a co
 ### 2. Build a GUI Application
 
 ```python
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 from amplifier_core import AmplifierSession
 
 class MyGUI:
@@ -286,7 +286,7 @@ class MyGUI:
 
 ```python
 from fastapi import FastAPI
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 
 app = FastAPI()
 pm = PathManager(app_name="my-api")

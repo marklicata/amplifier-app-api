@@ -1,7 +1,7 @@
 """Tests for mention loading."""
 
 import pytest
-from amplifier_foundation.mention_loading.utils import parse_mentions, extract_mention_path, has_mentions
+from amplifier_app_utils.mention_loading.utils import parse_mentions, extract_mention_path, has_mentions
 
 
 def test_parse_mentions_basic():

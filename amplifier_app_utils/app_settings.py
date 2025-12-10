@@ -38,7 +38,7 @@ class AppSettings:
     
     Example:
         ```python
-        from amplifier_foundation import PathManager, AppSettings
+        from amplifier_app_utils import PathManager, AppSettings
         
         pm = PathManager(app_name="my-app")
         config = pm.create_config_manager()

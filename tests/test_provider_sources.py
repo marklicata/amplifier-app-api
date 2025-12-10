@@ -2,7 +2,7 @@
 
 import pytest
 
-from amplifier_foundation.provider_sources import (
+from amplifier_app_utils.provider_sources import (
     DEFAULT_PROVIDER_SOURCES,
     get_effective_provider_sources,
     is_local_path,

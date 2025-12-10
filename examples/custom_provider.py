@@ -12,7 +12,7 @@ Usage:
 import asyncio
 
 from amplifier_core import AmplifierSession
-from amplifier_foundation import (
+from amplifier_app_utils import (
     KeyManager,
     PathManager,
     ProviderManager,

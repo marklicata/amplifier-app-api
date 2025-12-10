@@ -12,7 +12,7 @@ Usage:
 import asyncio
 
 from amplifier_core import AmplifierSession
-from amplifier_foundation import PathManager, resolve_app_config
+from amplifier_app_utils import PathManager, resolve_app_config
 
 
 async def main():

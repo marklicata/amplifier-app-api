@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 from amplifier_config import Scope
-from amplifier_foundation.app_settings import AppSettings, ScopeType, _SCOPE_MAP
+from amplifier_app_utils.app_settings import AppSettings, ScopeType, _SCOPE_MAP
 
 
 @pytest.fixture
@@ -160,7 +160,7 @@ def test_get_scope_provider_overrides_empty(app_settings, mock_config):
     assert providers == []
 
 
-@patch("amplifier_foundation.app_settings.DEFAULT_PROVIDER_SOURCES")
+@patch("amplifier_app_utils.app_settings.DEFAULT_PROVIDER_SOURCES")
 def test_apply_provider_overrides_to_profile(mock_sources, app_settings, mock_config):
     """Test applying provider overrides to profile."""
     from amplifier_profiles.schema import Profile, ModuleConfig
@@ -190,7 +190,7 @@ def test_apply_provider_overrides_to_profile(mock_sources, app_settings, mock_co
     assert result.providers[0].config["model"] == "override-model"
 
 
-@patch("amplifier_foundation.app_settings.DEFAULT_PROVIDER_SOURCES")
+@patch("amplifier_app_utils.app_settings.DEFAULT_PROVIDER_SOURCES")
 def test_apply_provider_overrides_adds_new_provider(mock_sources, app_settings, mock_config):
     """Test that applying overrides can add new providers."""
     from amplifier_profiles.schema import Profile, ModuleConfig

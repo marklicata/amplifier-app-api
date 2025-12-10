@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch
-from amplifier_foundation.effective_config import (
+from amplifier_app_utils.effective_config import (
     EffectiveConfigSummary,
     get_effective_config_summary,
     _select_provider_by_priority,
@@ -150,7 +150,7 @@ def test_select_provider_by_priority_invalid_entries():
     assert selected["module"] == "provider-valid"
 
 
-@patch("amplifier_foundation.provider_loader.get_provider_info")
+@patch("amplifier_app_utils.provider_loader.get_provider_info")
 def test_get_provider_display_name_from_info(mock_get_info):
     """Test getting provider display name from provider info."""
     mock_get_info.return_value = {"display_name": "Custom Provider Name"}
@@ -161,7 +161,7 @@ def test_get_provider_display_name_from_info(mock_get_info):
     mock_get_info.assert_called_once_with("provider-test")
 
 
-@patch("amplifier_foundation.provider_loader.get_provider_info")
+@patch("amplifier_app_utils.provider_loader.get_provider_info")
 def test_get_provider_display_name_known_providers(mock_get_info):
     """Test getting display name for known providers."""
     mock_get_info.return_value = None
@@ -174,7 +174,7 @@ def test_get_provider_display_name_known_providers(mock_get_info):
     assert _get_provider_display_name("provider-vllm") == "vLLM"
 
 
-@patch("amplifier_foundation.provider_loader.get_provider_info")
+@patch("amplifier_app_utils.provider_loader.get_provider_info")
 def test_get_provider_display_name_fallback(mock_get_info):
     """Test getting display name with fallback conversion."""
     mock_get_info.return_value = None
@@ -185,7 +185,7 @@ def test_get_provider_display_name_fallback(mock_get_info):
     assert name == "Custom Ai"
 
 
-@patch("amplifier_foundation.provider_loader.get_provider_info")
+@patch("amplifier_app_utils.provider_loader.get_provider_info")
 def test_get_provider_display_name_exception(mock_get_info):
     """Test getting display name when get_provider_info raises exception."""
     mock_get_info.side_effect = Exception("Provider not found")

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from amplifier_foundation.key_manager import KeyManager
+from amplifier_app_utils.key_manager import KeyManager
 
 
 @pytest.fixture

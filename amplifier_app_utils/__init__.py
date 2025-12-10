@@ -7,7 +7,7 @@ amplifier-collections, amplifier-profiles) to provide a simple, cohesive interfa
 
 Quick Start:
     ```python
-    from amplifier_foundation import PathManager, ProviderManager, SessionStore
+    from amplifier_app_utils import PathManager, ProviderManager, SessionStore
     
     # Set up paths and configuration
     pm = PathManager(app_name="my-app")
