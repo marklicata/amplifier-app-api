@@ -17,6 +17,8 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    "amplifier-core",
+    "amplifier-foundation",
 ]
 
 [project.scripts]
@@ -41,12 +43,13 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "httpx>=0.28.1",
     "ruff>=0.8.0",
+    "pyright>=1.1.0",
 ]
 
-# Using local forks instead of published packages
+# Using specific commit hashes to prevent breaking changes
 [tool.uv.sources]
-amplifier-core = { path = "../amplifier-core", editable = true }
-amplifier-foundation = { path = "../amplifier-foundation", editable = true }
+amplifier-core = { git = "https://github.com/microsoft/amplifier-core.git", rev = "976fb87335ffe398cf0c1bd1bcd3c2f2c154fc3c" }
+amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation.git", rev = "412fcb51980523c77339c32ef1ba3bc80c13b680" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
