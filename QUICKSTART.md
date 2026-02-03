@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get the Amplifier App Utils service running in 5 minutes.
+Get the Amplifier App api service running in 5 minutes.
 
 ## Prerequisites Check
 
@@ -23,7 +23,7 @@ Your workspace should look like:
 source/
 ├── amplifier-core/           ← Your fork
 ├── amplifier-foundation/     ← Your fork
-└── amplifier-app-utils/      ← This service
+└── amplifier-app-api/      ← This service
 ```
 
 ```bash
@@ -45,7 +45,7 @@ git clone git@github.com:YOUR_USERNAME/amplifier-foundation.git
 ## 2. Install Dependencies
 
 ```bash
-cd amplifier-app-utils
+cd amplifier-app-api
 
 # Install with uv (recommended)
 uv pip install -e .
@@ -104,7 +104,7 @@ This script:
 ### Option B: Direct uvicorn
 
 ```bash
-uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
+uvicorn amplifier_app_api.main:app --reload --host 0.0.0.0 --port 8765
 ```
 
 ### Option C: Using the installed script
@@ -205,7 +205,7 @@ curl http://localhost:8765/config
 
 ```bash
 # Install dependencies
-cd amplifier-app-utils
+cd amplifier-app-api
 uv pip install -e .
 ```
 
@@ -227,7 +227,7 @@ git clone <your-fork-url> amplifier-core
 lsof -ti:8765 | xargs kill
 
 # Or use a different port
-uvicorn amplifier_app_utils.main:app --reload --port 8766
+uvicorn amplifier_app_api.main:app --reload --port 8766
 ```
 
 ### "Database locked"
@@ -244,7 +244,7 @@ Make sure the paths in `.env` are correct:
 
 ```bash
 # Check the paths resolve
-ls -la $(python3 -c "from amplifier_app_utils.config import settings; print(settings.amplifier_core_path)")
+ls -la $(python3 -c "from amplifier_app_api.config import settings; print(settings.amplifier_core_path)")
 ```
 
 ## Next Steps

@@ -3,10 +3,10 @@
 
 set -e
 
-echo "🧪 Running Amplifier App Utils Test Suite"
+echo "🧪 Running Amplifier App api Test Suite"
 echo ""
 
-cd /mnt/c/Users/malicata/source/amplifier-app-utils
+cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 # Activate venv
 source .venv/bin/activate 2>/dev/null || true

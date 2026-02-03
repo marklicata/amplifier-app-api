@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: amplifier-app-utils
+    container_name: amplifier-app-api
     ports:
       - "8765:8765"
     environment:

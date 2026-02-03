@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Amplifier App Utils
+# Multi-stage Dockerfile for Amplifier App api
 
 FROM python:3.11-slim AS builder
 
@@ -16,7 +16,7 @@ WORKDIR /app
 
 # Copy project files
 COPY pyproject.toml README.md ./
-COPY amplifier_app_utils ./amplifier_app_utils
+COPY amplifier_app_api ./amplifier_app_api
 
 # Install dependencies
 RUN uv pip install --system -e .

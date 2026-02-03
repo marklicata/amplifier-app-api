@@ -1,4 +1,4 @@
-# Amplifier App Utils
+# Amplifier App api
 
 REST API service for the Amplifier AI development platform. Exposes Amplifier's capabilities through HTTP endpoints for integration with web applications, mobile apps, and other services.
 
@@ -24,7 +24,7 @@ See [QUICKSTART.md](QUICKSTART.md) for complete setup instructions (5 minutes).
 
 ```bash
 # 1. Install dependencies
-cd amplifier-app-utils
+cd amplifier-app-api
 uv pip install -e .
 
 # 2. Configure API key
@@ -43,8 +43,8 @@ curl http://localhost:8765/health
 ## Architecture
 
 ```
-amplifier-app-utils/
-├── amplifier_app_utils/
+amplifier-app-api/
+├── amplifier_app_api/
 │   ├── api/              # REST API endpoints
 │   │   ├── sessions.py   # Session management
 │   │   ├── config.py     # Configuration
@@ -260,7 +260,7 @@ amplifier-foundation = { path = "../amplifier-foundation", editable = true }
 ./run-dev.sh
 
 # Or directly with uvicorn
-uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
+uvicorn amplifier_app_api.main:app --reload --host 0.0.0.0 --port 8765
 ```
 
 ### Docker
@@ -270,8 +270,8 @@ uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
 docker-compose up -d
 
 # Or build manually
-docker build -t amplifier-app-utils .
-docker run -p 8765:8765 --env-file .env amplifier-app-utils
+docker build -t amplifier-app-api .
+docker run -p 8765:8765 --env-file .env amplifier-app-api
 ```
 
 See [SETUP.md](SETUP.md) for production deployment guide.
@@ -304,7 +304,7 @@ See [TESTING.md](TESTING.md) for complete testing guide.
 
 ## Differences from amplifier-app-cli
 
-| Feature | amplifier-app-cli | amplifier-app-utils |
+| Feature | amplifier-app-cli | amplifier-app-api |
 |---------|-------------------|---------------------|
 | **Interface** | CLI commands | REST API endpoints |
 | **Usage** | `amplifier run "prompt"` | `curl -X POST /sessions/{id}/messages` |
@@ -350,7 +350,7 @@ lsof -ti:8765 | xargs kill
 
 ```bash
 # Reinstall dependencies
-cd amplifier-app-utils
+cd amplifier-app-api
 uv pip install -e .
 ```
 

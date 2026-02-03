@@ -27,7 +27,7 @@ def live_service():
             sys.executable,
             "-m",
             "uvicorn",
-            "amplifier_app_utils.main:app",
+            "amplifier_app_api.main:app",
             "--host",
             "127.0.0.1",
             "--port",
@@ -97,7 +97,7 @@ class TestE2EHealthEndpoints:
         response = httpx.get(f"{live_service}/", timeout=5.0)
         assert response.status_code == 200
         data = response.json()
-        assert data["service"] == "Amplifier App Utils"
+        assert data["service"] == "Amplifier App api"
 
     def test_openapi_json(self, live_service):
         """GET /openapi.json"""

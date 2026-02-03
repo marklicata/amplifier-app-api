@@ -1,6 +1,6 @@
 # Implementation Summary
 
-**Service:** Amplifier App Utils  
+**Service:** Amplifier App api  
 **Type:** REST API wrapper for Amplifier  
 **Based on:** [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli)  
 **Status:** ✅ Core implementation complete  
@@ -14,8 +14,8 @@ A production-ready FastAPI service that exposes all Amplifier functionality thro
 ### 📦 Files Created (22 Python files + config)
 
 ```
-amplifier-app-utils/
-├── amplifier_app_utils/
+amplifier-app-api/
+├── amplifier_app_api/
 │   ├── api/                          # REST API layer
 │   │   ├── sessions.py               # Session CRUD + messaging + SSE streaming
 │   │   ├── config.py                 # Configuration management
@@ -184,7 +184,7 @@ SQLite with async support for:
 
 ## What's Different from amplifier-app-cli
 
-| Feature | amplifier-app-cli | amplifier-app-utils |
+| Feature | amplifier-app-cli | amplifier-app-api |
 |---------|-------------------|---------------------|
 | **Interface** | Click CLI commands | FastAPI REST endpoints |
 | **Dependencies** | Published packages from PyPI/GitHub | Local editable forks |
@@ -240,7 +240,7 @@ These are non-blocking and the service is fully functional without them.
 ### 1. Install and Configure (5 minutes)
 
 ```bash
-cd /mnt/c/Users/malicata/source/amplifier-app-utils
+cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 # Install dependencies
 uv pip install -e .
@@ -259,7 +259,7 @@ nano .env  # Add your API keys
 Or:
 
 ```bash
-uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
+uvicorn amplifier_app_api.main:app --reload --host 0.0.0.0 --port 8765
 ```
 
 ### 3. Test Basic Functionality (2 minutes)

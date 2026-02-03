@@ -3,7 +3,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from amplifier_app_utils.main import app
+from amplifier_app_api.main import app
 
 
 @pytest.mark.asyncio
@@ -106,7 +106,7 @@ class TestRootEndpoint:
             response = await client.get("/")
             assert response.status_code == 200
             data = response.json()
-            assert data["service"] == "Amplifier App Utils"
+            assert data["service"] == "Amplifier App api"
 
     async def test_root_docs_link(self):
         """Test docs link is provided."""

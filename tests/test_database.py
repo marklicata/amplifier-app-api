@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from amplifier_app_utils.storage.database import Database
+from amplifier_app_api.storage.database import Database
 
 
 @pytest.mark.asyncio

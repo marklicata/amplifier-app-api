@@ -17,7 +17,7 @@ def anyio_backend():
 @pytest.fixture(scope="function")
 async def test_db():
     """Create a test database for each test."""
-    from amplifier_app_utils.storage.database import Database
+    from amplifier_app_api.storage.database import Database
 
     # Create temporary database
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -32,7 +32,7 @@ async def test_db():
 @pytest.fixture(scope="function")
 def mock_session_manager():
     """Create a mock session manager that doesn't load amplifier-core."""
-    from amplifier_app_utils.models import Session, SessionMetadata, SessionStatus
+    from amplifier_app_api.models import Session, SessionMetadata, SessionStatus
 
     manager = Mock()
 
@@ -105,12 +105,12 @@ def mock_tool_manager():
 async def client(test_db, mock_session_manager, mock_tool_manager):
     """Create test client with all dependencies mocked."""
     # Set test database as global
-    import amplifier_app_utils.storage.database as db_module
-    from amplifier_app_utils.api import bundles, sessions, tools
-    from amplifier_app_utils.api import config as config_api
-    from amplifier_app_utils.core import ConfigManager
-    from amplifier_app_utils.main import app
-    from amplifier_app_utils.storage.database import get_db
+    import amplifier_app_api.storage.database as db_module
+    from amplifier_app_api.api import bundles, sessions, tools
+    from amplifier_app_api.api import config as config_api
+    from amplifier_app_api.core import ConfigManager
+    from amplifier_app_api.main import app
+    from amplifier_app_api.storage.database import get_db
 
     original_db = db_module._db
     db_module._db = test_db

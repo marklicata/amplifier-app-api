@@ -25,7 +25,7 @@ def live_service():
             ".venv/bin/python",
             "-m",
             "uvicorn",
-            "amplifier_app_utils.main:app",
+            "amplifier_app_api.main:app",
             "--host",
             "127.0.0.1",
             "--port",
@@ -90,7 +90,7 @@ class TestLiveServiceHealth:
         response = httpx.get(f"{live_service}/")
         assert response.status_code == 200
         data = response.json()
-        assert data["service"] == "Amplifier App Utils"
+        assert data["service"] == "Amplifier App api"
 
     def test_openapi_docs_accessible(self, live_service):
         """Test OpenAPI documentation is accessible."""

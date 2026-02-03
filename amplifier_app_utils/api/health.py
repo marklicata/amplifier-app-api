@@ -55,7 +55,7 @@ async def get_version() -> VersionResponse:
 async def root() -> dict[str, Any]:
     """Root endpoint with service information."""
     return {
-        "service": "Amplifier App Utils",
+        "service": "Amplifier App api",
         "version": __version__,
         "description": "REST API service for Amplifier AI development platform",
         "docs": "/docs",

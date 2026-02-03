@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from amplifier_app_utils.models import (
+from amplifier_app_api.models import (
     BundleAddRequest,
     MessageRequest,
     ProviderConfigRequest,

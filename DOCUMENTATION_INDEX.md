@@ -1,6 +1,6 @@
 # Documentation Index
 
-Complete documentation for Amplifier App Utils.
+Complete documentation for Amplifier App api.
 
 ## 📚 Documentation Structure
 
@@ -86,7 +86,7 @@ curl http://localhost:8765/smoke-tests/quick
 ## 📁 File Structure
 
 ```
-amplifier-app-utils/
+amplifier-app-api/
 ├── README.md                        # ← Start here
 ├── QUICKSTART.md                    # 5-minute setup
 ├── SETUP.md                         # Production guide
@@ -95,7 +95,7 @@ amplifier-app-utils/
 ├── DOCUMENTATION_INDEX.md           # This file
 ├── .env.example                     # Config template
 ├── pyproject.toml                   # Dependencies
-├── amplifier_app_utils/             # Source code
+├── amplifier_app_api/             # Source code
 └── tests/                           # Test suite
 ```
 

@@ -1,4 +1,4 @@
-# Testing Guide - Amplifier App Utils
+# Testing Guide - Amplifier App api
 
 Complete guide to the test suite for this service.
 
@@ -7,7 +7,7 @@ Complete guide to the test suite for this service.
 ### Run Tests (2 seconds)
 
 ```bash
-cd /mnt/c/Users/malicata/source/amplifier-app-utils
+cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 .venv/bin/python -m pytest tests/test_database.py tests/test_models.py -v
 ```

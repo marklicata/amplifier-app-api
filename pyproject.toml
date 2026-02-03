@@ -1,5 +1,5 @@
 [project]
-name = "amplifier-app-utils"
+name = "amplifier-app-api"
 version = "0.1.0"
 description = "REST API service for Amplifier AI development platform"
 license = "MIT"
@@ -20,13 +20,13 @@ dependencies = [
 ]
 
 [project.scripts]
-amplifier-service = "amplifier_app_utils.main:main"
+amplifier-service = "amplifier_app_api.main:main"
 
 [tool.uv]
 package = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["amplifier_app_utils"]
+packages = ["amplifier_app_api"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

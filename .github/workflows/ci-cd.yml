@@ -70,7 +70,7 @@ jobs:
           context: .
           file: ./Dockerfile
           load: true
-          tags: amplifier-app-utils:test
+          tags: amplifier-app-api:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -79,7 +79,7 @@ jobs:
           # Start container with test environment
           docker run -d --name test-container -p 8765:8765 \
             -e ANTHROPIC_API_KEY=test-key-placeholder \
-            amplifier-app-utils:test
+            amplifier-app-api:test
           
           # Wait for container to be ready
           echo "Waiting for container to start..."
@@ -136,9 +136,9 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:latest
-            ${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:latest
+            ${{ secrets.ACR_REGISTRY }}/amplifier-app-api:latest
+            ${{ secrets.ACR_REGISTRY }}/amplifier-app-api:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.ACR_REGISTRY }}/amplifier-app-api:latest
           cache-to: type=inline
 
   # Job 4: Deploy with Auto-Scaling
@@ -173,7 +173,7 @@ jobs:
             az containerapp update \
               --name ${{ secrets.CONTAINER_APP_NAME }} \
               --resource-group ${{ secrets.RESOURCE_GROUP }} \
-              --image ${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:${{ github.sha }} \
+              --image ${{ secrets.ACR_REGISTRY }}/amplifier-app-api:${{ github.sha }} \
               --min-replicas 3 \
               --max-replicas 10 \
               --revision-suffix $(echo ${{ github.sha }} | cut -c1-8)

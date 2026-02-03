@@ -10,7 +10,7 @@ Write-Host ""
 
 # Step 1: Build the image
 Write-Host "[Step 1/4] Building Docker image..." -ForegroundColor Yellow
-docker build -t amplifier-app-utils:test .
+docker build -t amplifier-app-api:test .
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Docker build failed!" -ForegroundColor Red
@@ -24,7 +24,7 @@ Write-Host ""
 Write-Host "[Step 2/4] Starting container..." -ForegroundColor Yellow
 $containerId = docker run -d --name amplifier-test -p 8765:8765 `
     -e ANTHROPIC_API_KEY=test-key `
-    amplifier-app-utils:test
+    amplifier-app-api:test
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Failed to start container!" -ForegroundColor Red

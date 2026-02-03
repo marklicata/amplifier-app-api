@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 # Create FastAPI application
 app = FastAPI(
-    title="Amplifier App Utils",
+    title="Amplifier App api",
     description="REST API service for Amplifier AI development platform",
     version="0.1.0",
     lifespan=lifespan,
@@ -99,7 +99,7 @@ def main() -> None:
     import uvicorn
 
     uvicorn.run(
-        "amplifier_app_utils.main:app",
+        "amplifier_app_api.main:app",
         host=settings.service_host,
         port=settings.service_port,
         workers=settings.service_workers,

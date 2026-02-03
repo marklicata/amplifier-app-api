@@ -5,7 +5,7 @@ import json
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from amplifier_app_utils.main import app
+from amplifier_app_api.main import app
 
 
 @pytest.mark.asyncio

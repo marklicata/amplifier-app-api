@@ -1,9 +1,9 @@
 #!/bin/bash
-# Development startup script for Amplifier App Utils
+# Development startup script for Amplifier App api
 
 set -e
 
-echo "🚀 Starting Amplifier App Utils Development Server"
+echo "🚀 Starting Amplifier App api Development Server"
 echo ""
 
 # Check if .env exists
@@ -45,5 +45,5 @@ echo ""
 
 # Start the service with auto-reload using uvicorn directly
 # No need for editable install - just run the module
-PYTHONPATH=/mnt/c/Users/malicata/source/amplifier-app-utils:$PYTHONPATH \
-.venv/bin/python -m uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
+PYTHONPATH=/mnt/c/Users/malicata/source/amplifier-app-api:$PYTHONPATH \
+.venv/bin/python -m uvicorn amplifier_app_api.main:app --reload --host 0.0.0.0 --port 8765

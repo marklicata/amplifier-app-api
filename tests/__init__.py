@@ -1,1 +1,1 @@
-"""Tests for amplifier-app-utils."""
+"""Tests for amplifier-app-api."""

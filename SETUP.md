@@ -1,6 +1,6 @@
 # Setup Guide
 
-Complete setup guide for deploying Amplifier App Utils.
+Complete setup guide for deploying Amplifier App api.
 
 ## Quick Start
 
@@ -12,7 +12,7 @@ Create the following directory structure:
 workspace/
 ├── amplifier-core/           # Your fork
 ├── amplifier-foundation/     # Your fork
-└── amplifier-app-utils/      # This service
+└── amplifier-app-api/      # This service
 ```
 
 ### 2. Fork Required Repositories
@@ -26,13 +26,13 @@ workspace/
 cd workspace
 git clone git@github.com:YOUR_USERNAME/amplifier-core.git
 git clone git@github.com:YOUR_USERNAME/amplifier-foundation.git
-git clone git@github.com:YOUR_USERNAME/amplifier-app-utils.git
+git clone git@github.com:YOUR_USERNAME/amplifier-app-api.git
 ```
 
 ### 3. Install Dependencies
 
 ```bash
-cd amplifier-app-utils
+cd amplifier-app-api
 
 # Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -68,7 +68,7 @@ AMPLIFIER_FOUNDATION_PATH=../amplifier-foundation
 
 ```bash
 # Development mode with auto-reload
-uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
+uvicorn amplifier_app_api.main:app --reload --host 0.0.0.0 --port 8765
 
 # Or using the CLI script
 amplifier-service
@@ -92,7 +92,7 @@ open http://localhost:8765/docs
 ### 1. Build Image
 
 ```bash
-docker build -t amplifier-app-utils .
+docker build -t amplifier-app-api .
 ```
 
 ### 2. Run with Docker Compose
