@@ -1,1 +1,1 @@
-# Test package
+"""Tests for amplifier-app-utils."""

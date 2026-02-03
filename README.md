@@ -1,348 +1,373 @@
-# Amplifier Foundation
+# Amplifier App Utils
 
-**Common library for building Amplifier applications**
+REST API service for the Amplifier AI development platform. Exposes Amplifier's capabilities through HTTP endpoints for integration with web applications, mobile apps, and other services.
 
-A unified, high-level API that abstracts the complexity of the Amplifier AI platform. Build CLI, GUI, web APIs, and other applications with minimal boilerplate.
+## Overview
 
-## 🎯 Purpose
+This service is based on [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli) but provides REST API access instead of CLI commands. It uses **local forks** of `amplifier-core` and `amplifier-foundation` for independent development.
 
-Amplifier Foundation extracts the common infrastructure needed by all Amplifier applications, providing a clean abstraction over the core Amplifier dependencies.
+**Key Features:**
+- 🔌 RESTful API for Amplifier sessions
+- 📦 Bundle and provider management
+- 🛠️ Tool invocation endpoints
+- 📝 Configuration management
+- 💾 SQLite-based persistence
+- 🔄 Server-Sent Events (SSE) for streaming
+- 🐳 Docker deployment ready
+- 🧪 164+ tests with 100% endpoint coverage
 
-**Before Foundation:**
-```python
-# 500+ lines of boilerplate across 5 dependencies...
-from amplifier_core import AmplifierSession
-from amplifier_config import ConfigManager, ConfigPaths
-from amplifier_profiles import ProfileLoader
-from amplifier_module_resolution import ModuleResolver
-# ...hundreds of lines of setup code...
-```
+## Quick Start
 
-**After Foundation:**
-```python
-from amplifier_app_utils import PathManager, resolve_app_config
-from amplifier_core import AmplifierSession
+See [QUICKSTART.md](QUICKSTART.md) for complete setup instructions (5 minutes).
 
-pm = PathManager(app_name="my-app")
-config_mgr = pm.create_config_manager()
-profile_loader = pm.create_profile_loader()
-agent_loader = pm.create_agent_loader()
-
-config = resolve_app_config(
-    config_manager=config_mgr,
-    profile_loader=profile_loader,
-    agent_loader=agent_loader,
-)
-
-session = AmplifierSession(config=config)
-await session.initialize()
-# Done! Ready to build.
-```
-
-**95% boilerplate reduction** from 500+ lines to ~25 lines.
-
-## 🚀 Quick Start
-
-### Installation
+### Fast Start
 
 ```bash
-pip install amplifier-app-utils
-```
-
-### Build a Minimal App
-
-```python
-from amplifier_app_utils import PathManager, resolve_app_config
-from amplifier_core import AmplifierSession
-
-# Setup
-pm = PathManager(app_name="my-cool-app")
-config_mgr = pm.create_config_manager()
-profile_loader = pm.create_profile_loader()
-agent_loader = pm.create_agent_loader()
-
-# Resolve configuration
-config = resolve_app_config(
-    config_manager=config_mgr,
-    profile_loader=profile_loader,
-    agent_loader=agent_loader,
-)
-
-# Create and run session
-session = AmplifierSession(config=config)
-await session.initialize()
-
-response = await session.execute("Hello!")
-print(response)
-```
-
-See [examples/](examples/) for complete working applications.
-
-## 📦 What's Included
-
-### All 13 Core Components (100%)
-
-| Component | Purpose | LOC | Tests |
-|-----------|---------|-----|-------|
-| **PathManager** | Path resolution with dependency injection | 430 | 8 |
-| **Mention Loading** | @mention system (models, resolver, loader, utils) | 220 | 7 |
-| **Provider Sources** | Canonical provider sources & installation | 180 | 7 |
-| **Session Store** | Atomic persistence with backup/recovery | 420 | 11 |
-| **Key Manager** | Secure API key storage | 90 | 7 |
-| **Project Utils** | Project slug generation | 30 | 2 |
-| **Provider Manager** | Provider lifecycle management | 400 | 12 |
-| **Provider Loader** | Lightweight provider loading | 280 | - |
-| **Module Manager** | Module installation and management | 210 | 10 |
-| **App Settings** | High-level settings helpers | 150 | 12 |
-| **Effective Config** | Display-friendly config summaries | 110 | 9 |
-| **Session Spawner** | Agent delegation (sub-sessions) | 350 | 9 |
-| **Config Resolver** | Complete config resolution pipeline | 200 | 9 |
-| **TOTAL** | | **3,070** | **111** |
-
-### Features
-
-✅ **Zero Boilerplate** - One import, ~25 lines to get started  
-✅ **Dependency Injection** - PathManager provides factories for all core objects  
-✅ **Battle-Tested** - Extracted from production CLI with 111 passing tests  
-✅ **Type-Safe** - Full type hints with mypy compatibility  
-✅ **Well-Documented** - Every module has comprehensive docstrings  
-✅ **Cross-Platform** - Windows, macOS, Linux support  
-✅ **Production-Ready** - Used by amplifier-app-cli
-
-## 🏗️ Architecture
-
-```
-Your Application (CLI, GUI, API, etc.)
-         ↓ uses
-Amplifier Foundation (this library)
-         ↓ orchestrates
-Core Dependencies (abstracted)
-  ├─ amplifier-core
-  ├─ amplifier-config
-  ├─ amplifier-module-resolution
-  ├─ amplifier-collections
-  └─ amplifier-profiles
-```
-
-The foundation handles all the complexity of coordinating these dependencies, providing a clean, stable API.
-
-## 📚 Core APIs
-
-### Path Management
-
-The central hub for all Amplifier paths and factories:
-
-```python
-from amplifier_app_utils import PathManager
-
-# Create with custom app name
-pm = PathManager(app_name="my-app")
-
-# Get factories
-config = pm.create_config_manager()
-profile_loader = pm.create_profile_loader()
-agent_loader = pm.create_agent_loader()
-collection_loader = pm.create_collection_loader()
-
-# Access paths directly
-print(pm.workspace_dir)  # ~/.amplifier/
-print(pm.config_paths.user)  # ~/.amplifier/settings.yaml
-print(pm.session_dir)  # ~/.amplifier/projects/<slug>/sessions/
-```
-
-### Configuration Resolution
-
-Complete pipeline from settings to runtime config:
-
-```python
-from amplifier_app_utils import resolve_app_config
-
-config = resolve_app_config(
-    config_manager=config_mgr,
-    profile_loader=profile_loader,
-    agent_loader=agent_loader,
-    profile_override="dev",
-    model_override="claude-sonnet-4-5",
-    max_tokens_override=100000,
-)
-```
-
-### Provider Management
-
-```python
-from amplifier_app_utils import ProviderManager, DEFAULT_PROVIDER_SOURCES
-
-# Get canonical sources
-print(DEFAULT_PROVIDER_SOURCES["provider-anthropic"])
-# => "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main"
-
-# Manage providers
-pm = ProviderManager(config_manager)
-pm.use_provider("provider-anthropic", scope="global")
-print(pm.get_current_provider())
-pm.reset_provider(scope="project")
-```
-
-### Session Management
-
-```python
-from amplifier_app_utils import SessionStore, SessionSpawner
-
-# Persistence
-store = SessionStore()
-store.save(session_id="s1", transcript=[...], metadata={...})
-transcript, metadata = store.load("s1")
-
-# Agent delegation
-spawner = SessionSpawner(session_store=store)
-child_id = spawner.spawn_session(
-    parent_id="s1",
-    agent_name="researcher",
-    instructions="Find information about X"
-)
-```
-
-### Key Management
-
-```python
-from amplifier_app_utils import KeyManager
-
-km = KeyManager()
-km.save_key("ANTHROPIC_API_KEY", "sk-ant-...")
-km.has_key("ANTHROPIC_API_KEY")  # => True
-km.get_configured_provider()  # => "anthropic"
-```
-
-### Mention Loading
-
-```python
-from amplifier_app_utils.mention_loading import (
-    parse_mentions,
-    MentionResolver,
-    ContentLoader,
-)
-
-# Parse @mentions from text
-mentions = parse_mentions("Check @README.md and @src/main.py")
-
-# Resolve and load content
-resolver = MentionResolver(...)
-loader = ContentLoader(resolver=resolver)
-content = await loader.load_mentions(mentions, max_depth=3)
-```
-
-## 🧪 Testing
-
-Run the test suite:
-
-```bash
-git clone https://github.com/microsoft/amplifier-app-utils
+# 1. Install dependencies
 cd amplifier-app-utils
-uv sync
-uv run pytest tests/ -v
+uv pip install -e .
+
+# 2. Configure API key
+cp .env.example .env
+nano .env  # Add your ANTHROPIC_API_KEY or OPENAI_API_KEY
+
+# 3. Start service
+./run-dev.sh
+
+# 4. Verify
+curl http://localhost:8765/health
 ```
 
-**Current status:** 111 tests, 100% pass rate ✅
+**API Docs:** http://localhost:8765/docs
 
-## 📖 Documentation
+## Architecture
 
-- **[QUICK_START.md](QUICK_START.md)** - Detailed getting started guide
-- **[examples/](examples/)** - Working example applications
-  - `minimal_repl.py` - Minimal REPL (25 lines)
-  - `agent_delegation.py` - Agent spawning demo
-  - `custom_provider.py` - Custom provider configuration
-
-## 🎯 Use Cases
-
-### 1. Build a CLI Application
-
-See [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli) for a complete reference implementation.
-
-### 2. Build a GUI Application
-
-```python
-from amplifier_app_utils import PathManager, resolve_app_config
-from amplifier_core import AmplifierSession
-
-class MyGUI:
-    def __init__(self):
-        pm = PathManager(app_name="my-gui")
-        self.config_mgr = pm.create_config_manager()
-        self.profile_loader = pm.create_profile_loader()
-        self.agent_loader = pm.create_agent_loader()
-    
-    async def send_message(self, text: str):
-        config = resolve_app_config(
-            config_manager=self.config_mgr,
-            profile_loader=self.profile_loader,
-            agent_loader=self.agent_loader,
-        )
-        session = AmplifierSession(config=config)
-        await session.initialize()
-        return await session.execute(text)
+```
+amplifier-app-utils/
+├── amplifier_app_utils/
+│   ├── api/              # REST API endpoints
+│   │   ├── sessions.py   # Session management
+│   │   ├── config.py     # Configuration
+│   │   ├── bundles.py    # Bundle management
+│   │   ├── tools.py      # Tool invocation
+│   │   ├── health.py     # Health checks
+│   │   └── smoke.py      # Smoke test endpoint
+│   ├── core/             # Business logic
+│   │   ├── session_manager.py   # Wraps amplifier-core
+│   │   ├── config_manager.py    # Config management
+│   │   └── tool_manager.py      # Tool operations
+│   ├── models/           # Pydantic data models
+│   ├── storage/          # Database layer (SQLite)
+│   ├── config.py         # Application settings
+│   └── main.py           # FastAPI application
+├── tests/                # 164+ test cases
+├── Dockerfile
+├── docker-compose.yml
+└── pyproject.toml        # Uses local forks
 ```
 
-### 3. Build a Web API
+## Prerequisites
 
-```python
-from fastapi import FastAPI
-from amplifier_app_utils import PathManager, resolve_app_config
+- Python 3.11+
+- [UV](https://github.com/astral-sh/uv) package manager
+- Local forks of:
+  - `amplifier-core` (at `../amplifier-core`)
+  - `amplifier-foundation` (at `../amplifier-foundation`)
 
-app = FastAPI()
-pm = PathManager(app_name="my-api")
+## API Endpoints
 
-@app.post("/chat")
-async def chat(message: str):
-    config = resolve_app_config(
-        config_manager=pm.create_config_manager(),
-        profile_loader=pm.create_profile_loader(),
-        agent_loader=pm.create_agent_loader(),
-    )
-    session = AmplifierSession(config=config)
-    await session.initialize()
-    response = await session.execute(message)
-    return {"response": response}
-```
+### Session Management (8 endpoints)
 
-## 🤝 Contributing
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/sessions/create` | Create a new session |
+| GET | `/sessions` | List all sessions |
+| GET | `/sessions/{id}` | Get session details |
+| DELETE | `/sessions/{id}` | Delete a session |
+| POST | `/sessions/{id}/resume` | Resume existing session |
+| POST | `/sessions/{id}/messages` | Send message |
+| POST | `/sessions/{id}/stream` | Stream responses (SSE) |
+| POST | `/sessions/{id}/cancel` | Cancel operation |
 
-Contributions welcome! This library is extracted from production CLI code, so changes should maintain backward compatibility and high test coverage (>90%).
+### Configuration (7 endpoints)
 
-### Development Setup
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/config` | Get all configuration |
+| POST | `/config` | Update configuration |
+| GET | `/config/providers` | List providers |
+| POST | `/config/providers` | Add/update provider |
+| GET | `/config/providers/{name}` | Get provider config |
+| POST | `/config/providers/{name}/activate` | Set active provider |
+| GET | `/config/providers/current` | Get active provider |
+
+### Bundles (5 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/bundles` | List all bundles |
+| POST | `/bundles` | Add a bundle |
+| GET | `/bundles/{name}` | Get bundle details |
+| DELETE | `/bundles/{name}` | Remove bundle |
+| POST | `/bundles/{name}/activate` | Set active bundle |
+
+### Tools (3 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/tools` | List available tools |
+| GET | `/tools/{name}` | Get tool information |
+| POST | `/tools/invoke` | Invoke a tool |
+
+### Health & Testing (5 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Service health check |
+| GET | `/version` | Version information |
+| GET | `/` | Service information |
+| GET | `/smoke-tests/quick` | Quick smoke tests via API |
+| GET | `/smoke-tests` | Full test suite via API |
+
+**Total: 28 endpoints**
+
+## Usage Examples
+
+### Create a Session
 
 ```bash
-git clone https://github.com/microsoft/amplifier-app-utils
-cd amplifier-app-utils
-uv sync --dev
-uv run pytest tests/ -v
+curl -X POST http://localhost:8765/sessions/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bundle": "foundation",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5"
+  }'
 ```
 
-## 📋 Status
+**Response:**
+```json
+{
+  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "active",
+  "metadata": {
+    "bundle": "foundation",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "created_at": "2026-02-03T17:00:00",
+    "message_count": 0
+  },
+  "message": "Session created successfully"
+}
+```
 
-| Phase | Status | Progress |
-|-------|--------|----------|
-| Core Infrastructure | ✅ Complete | 100% |
-| Provider Management | ✅ Complete | 100% |
-| Session Management | ✅ Complete | 100% |
-| Module Management | ✅ Complete | 100% |
-| Testing | ✅ Complete | 100% |
-| Documentation | ✅ Complete | 100% |
-| PyPI Publication | ⏸️ Planned | 0% |
+### Send a Message
 
-**Overall Progress:** ~95% complete
+```bash
+curl -X POST http://localhost:8765/sessions/{session_id}/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Create a Python function to calculate fibonacci numbers"
+  }'
+```
 
-## 📄 License
+**Response:**
+```json
+{
+  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "response": "Here's a Python function...",
+  "metadata": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5"
+  }
+}
+```
 
-MIT License - see [LICENSE](LICENSE)
+### Run Smoke Tests
 
-## 🙏 Credits
+```bash
+# Quick health checks
+curl http://localhost:8765/smoke-tests/quick
+```
 
-Extracted from [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli) with contributions from the Amplifier team.
+**Response:**
+```json
+{
+  "success": true,
+  "passed": 4,
+  "failed": 0,
+  "total": 4,
+  "tests": [
+    {"name": "health_endpoint", "passed": true},
+    {"name": "database_connectivity", "passed": true},
+    {"name": "sessions_endpoint", "passed": true},
+    {"name": "config_endpoint", "passed": true}
+  ]
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+Create `.env` from `.env.example` and configure:
+
+```bash
+# Required: At least one API key
+ANTHROPIC_API_KEY=your-key-here
+# OR
+OPENAI_API_KEY=your-key-here
+
+# Service settings
+SERVICE_HOST=0.0.0.0
+SERVICE_PORT=8765
+
+# Database
+DATABASE_URL=sqlite+aiosqlite:///./amplifier.db
+
+# Local fork paths (default: ../amplifier-core and ../amplifier-foundation)
+AMPLIFIER_CORE_PATH=../amplifier-core
+AMPLIFIER_FOUNDATION_PATH=../amplifier-foundation
+
+# CORS (comma-separated)
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+```
+
+### Using Local Forks
+
+This service uses **editable local forks** instead of published packages:
+
+```toml
+[tool.uv.sources]
+amplifier-core = { path = "../amplifier-core", editable = true }
+amplifier-foundation = { path = "../amplifier-foundation", editable = true }
+```
+
+**Benefits:**
+- Changes to forks immediately reflected
+- Full control over versioning
+- Independent development
+
+**Trade-off:**
+- Manual upstream syncing required
+
+## Deployment
+
+### Development
+
+```bash
+# Using the development script (recommended)
+./run-dev.sh
+
+# Or directly with uvicorn
+uvicorn amplifier_app_utils.main:app --reload --host 0.0.0.0 --port 8765
+```
+
+### Docker
+
+```bash
+# Using Docker Compose (recommended)
+docker-compose up -d
+
+# Or build manually
+docker build -t amplifier-app-utils .
+docker run -p 8765:8765 --env-file .env amplifier-app-utils
+```
+
+See [SETUP.md](SETUP.md) for production deployment guide.
+
+## Testing
+
+The service includes a comprehensive test suite with 164+ test cases.
+
+### Run Tests
+
+```bash
+# Quick tests (41 tests in ~2 seconds)
+.venv/bin/python -m pytest tests/test_database.py tests/test_models.py -v
+
+# All tests
+.venv/bin/python -m pytest tests/ -v
+```
+
+### Test via API
+
+```bash
+# Start service
+./run-dev.sh
+
+# Run smoke tests via HTTP
+curl http://localhost:8765/smoke-tests/quick
+```
+
+See [TESTING.md](TESTING.md) for complete testing guide.
+
+## Differences from amplifier-app-cli
+
+| Feature | amplifier-app-cli | amplifier-app-utils |
+|---------|-------------------|---------------------|
+| **Interface** | CLI commands | REST API endpoints |
+| **Usage** | `amplifier run "prompt"` | `curl -X POST /sessions/{id}/messages` |
+| **Dependencies** | Published packages | Local editable forks |
+| **Session storage** | Filesystem (JSONL) | SQLite database |
+| **Streaming** | Terminal output | Server-Sent Events (SSE) |
+| **Deployment** | Local install | Docker container / web service |
+
+## Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Get running in 5 minutes
+- **[SETUP.md](SETUP.md)** - Production deployment guide
+- **[TESTING.md](TESTING.md)** - Test suite documentation
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Architecture and design
+
+## Troubleshooting
+
+### "Database not connected" error
+
+The database auto-initializes on first request. If you see this error, verify the database path is writable.
+
+### "amplifier-core not found" error
+
+Verify local fork paths:
+```bash
+ls -la ../amplifier-core
+ls -la ../amplifier-foundation
+```
+
+Update paths in `.env` if different.
+
+### Port already in use
+
+```bash
+# Change port in .env
+SERVICE_PORT=8766
+
+# Or kill existing process
+lsof -ti:8765 | xargs kill
+```
+
+### Import errors
+
+```bash
+# Reinstall dependencies
+cd amplifier-app-utils
+uv pip install -e .
+```
+
+## Contributing
+
+This is a custom service for specific deployment needs. If building something similar, fork and customize for your use case.
+
+## License
+
+MIT License (same as amplifier-app-cli)
+
+## Related Projects
+
+- [amplifier-core](https://github.com/microsoft/amplifier-core) - Amplifier kernel
+- [amplifier-foundation](https://github.com/microsoft/amplifier-foundation) - Foundation library  
+- [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli) - CLI reference implementation
 
 ---
 
-**Status:** Beta - Production Ready  
-**Test Coverage:** 111 tests, 100% pass rate  
-**Python:** 3.11+  
-**Platform:** Windows, macOS, Linux  
-**Used By:** amplifier-app-cli
+**Built with ❤️ using Amplifier**

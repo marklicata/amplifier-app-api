@@ -1,0 +1,309 @@
+name: CI/CD Pipeline
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Lint and Type Check
+  lint-and-test:
+    name: Lint, Type Check, and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run ruff format check
+        run: ruff format --check .
+        continue-on-error: true
+
+      - name: Run ruff lint
+        run: ruff check .
+        continue-on-error: true
+
+      - name: Run type check
+        run: pyright
+        continue-on-error: true
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  # Job 2: Build and Test Docker Image
+  build-and-test:
+    name: Build and Test Docker Image
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: amplifier-app-utils:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          # Start container with test environment
+          docker run -d --name test-container -p 8765:8765 \
+            -e ANTHROPIC_API_KEY=test-key-placeholder \
+            amplifier-app-utils:test
+          
+          # Wait for container to be ready
+          echo "Waiting for container to start..."
+          sleep 10
+          
+          # Check if container is running
+          docker ps | grep test-container
+          
+          # Health check
+          for i in {1..30}; do
+            if curl -f http://localhost:8765/health 2>/dev/null; then
+              echo "Health check passed!"
+              break
+            fi
+            echo "Waiting for health check... ($i/30)"
+            sleep 2
+          done
+          
+          # Show logs for debugging
+          docker logs test-container
+          
+          # Cleanup
+          docker stop test-container
+          docker rm test-container
+
+  # Job 3: Publish Docker Image
+  publish-docker:
+    name: Publish Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:latest
+            ${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:latest
+          cache-to: type=inline
+
+  # Job 4: Deploy with Auto-Scaling
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: publish-docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      app-url: ${{ steps.deploy.outputs.app-url }}
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Container App with Auto-Scaling
+        id: deploy
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlineScript: |
+            echo "Deploying with auto-scaling configuration..."
+            
+            # Update container app with new image and scaling rules
+            az containerapp update \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --image ${{ secrets.ACR_REGISTRY }}/amplifier-app-utils:${{ github.sha }} \
+              --min-replicas 3 \
+              --max-replicas 10 \
+              --revision-suffix $(echo ${{ github.sha }} | cut -c1-8)
+            
+            # Configure CPU-based auto-scaling
+            az containerapp update \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --scale-rule-name cpu-scale \
+              --scale-rule-type cpu \
+              --scale-rule-metadata type=Utilization value=70
+            
+            # Configure HTTP-based auto-scaling (concurrent requests)
+            az containerapp update \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --scale-rule-name http-scale \
+              --scale-rule-type http \
+              --scale-rule-http-concurrency 50
+            
+            echo "Deployment completed successfully!"
+            
+            # Get the app URL
+            APP_URL=$(az containerapp show \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --query properties.configuration.ingress.fqdn \
+              --output tsv)
+            
+            echo "App URL: https://$APP_URL"
+            echo "Scaling: 3-10 replicas based on CPU (70%) and concurrent requests (50)"
+            echo "app-url=https://$APP_URL" >> $GITHUB_OUTPUT
+
+  # Job 5: Smoke Tests on Production
+  smoke-test:
+    name: Smoke Tests on Production
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Wait for deployment to stabilize
+        run: |
+          echo "Waiting 30 seconds for deployment to stabilize..."
+          sleep 30
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run smoke tests
+        run: |
+          APP_URL="${{ needs.deploy.outputs.app-url }}"
+          echo "Running smoke tests against: $APP_URL"
+          
+          # Health check
+          echo "1️⃣ Testing /health endpoint..."
+          if ! curl -f -s "$APP_URL/health" | jq -e '.status == "healthy"' > /dev/null; then
+            echo "❌ Health check failed!"
+            exit 1
+          fi
+          echo "✅ Health check passed"
+          
+          # Version check
+          echo "2️⃣ Testing /version endpoint..."
+          if ! curl -f -s "$APP_URL/version" > /dev/null; then
+            echo "❌ Version endpoint failed!"
+            exit 1
+          fi
+          echo "✅ Version endpoint passed"
+          
+          # Quick smoke tests via API
+          echo "3️⃣ Running quick smoke tests..."
+          SMOKE_RESULT=$(curl -f -s "$APP_URL/smoke-tests/quick")
+          echo "$SMOKE_RESULT" | jq '.'
+          
+          # Check if smoke tests passed
+          if ! echo "$SMOKE_RESULT" | jq -e '.success == true' > /dev/null; then
+            echo "❌ Smoke tests failed!"
+            echo "$SMOKE_RESULT" | jq '.tests[] | select(.passed == false)'
+            exit 1
+          fi
+          echo "✅ All smoke tests passed"
+          
+          # Final summary
+          echo ""
+          echo "🎉 Production deployment verified successfully!"
+          echo "Service URL: $APP_URL"
+          echo "API Docs: $APP_URL/docs"
+
+      - name: Check scaling status
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlineScript: |
+            echo "📊 Current replica status:"
+            az containerapp replica list \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --query "[].{Name:name, Status:properties.runningState}" \
+              --output table
+
+      - name: Rollback on failure
+        if: failure()
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlineScript: |
+            echo "⚠️ Smoke tests failed! Rolling back..."
+            
+            # Get the current active revision
+            CURRENT_REVISION=$(az containerapp revision list \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --query "[?properties.active && properties.trafficWeight > 0] | [0].name" \
+              --output tsv)
+            
+            echo "Current revision: $CURRENT_REVISION"
+            
+            # Deactivate the failed revision
+            FAILED_REVISION="${{ secrets.CONTAINER_APP_NAME }}--$(echo ${{ github.sha }} | cut -c1-8)"
+            az containerapp revision deactivate \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --revision "$FAILED_REVISION" || echo "Failed to deactivate revision"
+            
+            echo "Rollback completed. Previous revision is now active."

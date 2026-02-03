@@ -1,20 +1,26 @@
 [project]
 name = "amplifier-app-utils"
 version = "0.1.0"
-description = "Common utility library for building Amplifier applications"
+description = "REST API service for Amplifier AI development platform"
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Microsoft MADE:Explorations Team" }]
+authors = [{ name = "Your Organization" }]
 dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
     "pydantic>=2.0.0",
-    "amplifier-core",
-    "amplifier-config",
-    "amplifier-collections",
-    "amplifier-module-resolution",
-    "amplifier-profiles",
+    "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.3",
+    "httpx>=0.28.1",
+    "python-multipart>=0.0.9",
+    "aiosqlite>=0.20.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
 ]
+
+[project.scripts]
+amplifier-service = "amplifier_app_utils.main:main"
 
 [tool.uv]
 package = true
@@ -30,16 +36,27 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["pytest>=8.4.2", "pytest-asyncio>=0.24.0"]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.1",
+    "ruff>=0.8.0",
+]
 
+# Using local forks instead of published packages
 [tool.uv.sources]
-amplifier-core = { git = "https://github.com/microsoft/amplifier-core", branch = "main" }
-amplifier-config = { git = "https://github.com/microsoft/amplifier-config", branch = "main" }
-amplifier-module-resolution = { git = "https://github.com/microsoft/amplifier-module-resolution", branch = "main" }
-amplifier-collections = { git = "https://github.com/microsoft/amplifier-collections", branch = "main" }
-amplifier-profiles = { git = "https://github.com/microsoft/amplifier-profiles", branch = "main" }
+amplifier-core = { path = "../amplifier-core", editable = true }
+amplifier-foundation = { path = "../amplifier-foundation", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 asyncio_mode = "strict"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Line too long (handled by formatter)

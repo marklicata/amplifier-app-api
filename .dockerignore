@@ -8,57 +8,43 @@ __pycache__/
 dist/
 build/
 *.egg
-pip-log.txt
-pip-delete-this-directory.txt
 
 # Virtual environments
 .venv/
 venv/
 ENV/
-env/
 
 # IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*.sublime-*
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
-.tox/
-.ruff_cache/
-.claude/
+
+# Git
+.git/
+.gitignore
+
+# Docs
+docs/_build/
 
 # Database
 *.db
 *.sqlite
-*.sqlite3
 
 # Logs
 *.log
-logs/
 
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*.local
 
 # macOS
 .DS_Store
 
 # Session data
 sessions/
-*.jsonl
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Build artifacts
-dist/
-build/
-*.whl
