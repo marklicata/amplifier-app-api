@@ -158,8 +158,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Set Subscription
-        run: az account set --su
 
       - name: Deploy to Container App with Auto-Scaling
         id: deploy
