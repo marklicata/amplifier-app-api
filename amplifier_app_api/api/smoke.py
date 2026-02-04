@@ -149,8 +149,8 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
         from ..storage import get_db
 
         db = await get_db()
-        all_config = await db.get_all_config()
-        test_passed = isinstance(all_config, dict)
+        all_config = await db.count_configs()
+        test_passed = isinstance(all_config, int)
         results["tests"].append({"name": "database_connectivity", "passed": test_passed})
         if test_passed:
             results["passed"] += 1
@@ -179,7 +179,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
     try:
         app = _get_app()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/config")
+            response = await client.get("/configs")
             test_passed = response.status_code == 200
             results["tests"].append({"name": "config_endpoint", "passed": test_passed})
             if test_passed:
@@ -188,6 +188,42 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
                 results["failed"] += 1
     except Exception as e:
         results["tests"].append({"name": "config_endpoint", "passed": False, "error": str(e)})
+        results["failed"] += 1
+
+    results["success"] = results["failed"] == 0
+    results["total"] = results["passed"] + results["failed"]
+
+    # Test 5: Bundles endpoint
+    try:
+        app = _get_app()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/bundles")
+            test_passed = response.status_code == 200
+            results["tests"].append({"name": "bundles_endpoint", "passed": test_passed})
+            if test_passed:
+                results["passed"] += 1
+            else:
+                results["failed"] += 1
+    except Exception as e:
+        results["tests"].append({"name": "bundles_endpoint", "passed": False, "error": str(e)})
+        results["failed"] += 1
+
+    results["success"] = results["failed"] == 0
+    results["total"] = results["passed"] + results["failed"]
+
+    # Test 6: Tools endpoint
+    try:
+        app = _get_app()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/tools")
+            test_passed = response.status_code == 200
+            results["tests"].append({"name": "tools_endpoint", "passed": test_passed})
+            if test_passed:
+                results["passed"] += 1
+            else:
+                results["failed"] += 1
+    except Exception as e:
+        results["tests"].append({"name": "tools_endpoint", "passed": False, "error": str(e)})
         results["failed"] += 1
 
     results["success"] = results["failed"] == 0

@@ -242,6 +242,7 @@ jobs:
             exit 1
           fi
           echo "✅ Health check passed"
+          echo ""
           
           # Version check
           echo "2️⃣ Testing /version endpoint..."
@@ -250,6 +251,7 @@ jobs:
             exit 1
           fi
           echo "✅ Version endpoint passed"
+          echo ""
           
           # Quick smoke tests via API
           echo "3️⃣ Running quick smoke tests..."
@@ -263,6 +265,7 @@ jobs:
             exit 1
           fi
           echo "✅ All smoke tests passed"
+          echo ""
           
           # Final summary
           echo ""
