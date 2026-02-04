@@ -228,7 +228,7 @@ jobs:
       - name: Run smoke tests
         run: |
           # Get the app URL
-          APP_URL=$(az containerapp show \
+          APP_URL=https://$(az containerapp show \
             --name ${{ secrets.CONTAINER_APP_NAME }} \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
             --query properties.configuration.ingress.fqdn \
