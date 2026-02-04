@@ -1,8 +1,15 @@
 """Data models for the Amplifier service."""
 
+from .config import (
+    Config,
+    ConfigCreateRequest,
+    ConfigListResponse,
+    ConfigMetadata,
+    ConfigResponse,
+    ConfigUpdateRequest,
+)
 from .requests import (
     BundleAddRequest,
-    ConfigUpdateRequest,
     MessageRequest,
     ProviderConfigRequest,
     RecipeExecuteRequest,
@@ -12,7 +19,6 @@ from .requests import (
 from .responses import (
     BundleInfo,
     BundleListResponse,
-    ConfigResponse,
     HealthResponse,
     MessageResponse,
     ProviderInfo,
@@ -27,11 +33,17 @@ from .responses import (
 from .session import Session, SessionMetadata, SessionStatus
 
 __all__ = [
+    # Config models
+    "Config",
+    "ConfigMetadata",
+    "ConfigCreateRequest",
+    "ConfigUpdateRequest",
+    "ConfigResponse",
+    "ConfigListResponse",
     # Request models
     "SessionCreateRequest",
     "MessageRequest",
     "ProviderConfigRequest",
-    "ConfigUpdateRequest",
     "BundleAddRequest",
     "RecipeExecuteRequest",
     "ToolInvokeRequest",
@@ -40,7 +52,6 @@ __all__ = [
     "SessionInfo",
     "SessionListResponse",
     "MessageResponse",
-    "ConfigResponse",
     "ProviderInfo",
     "BundleInfo",
     "BundleListResponse",

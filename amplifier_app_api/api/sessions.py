@@ -26,32 +26,51 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 async def get_session_manager(db: Database = Depends(get_db)) -> SessionManager:
     """Dependency to get session manager."""
-    return SessionManager(db)
+    try:
+        return SessionManager(db)
+    except RuntimeError as e:
+        logger.error(f"SessionManager initialization failed: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Session service unavailable. Amplifier dependencies not configured. "
+                   "Please set AMPLIFIER_CORE_PATH and AMPLIFIER_FOUNDATION_PATH in .env file."
+        )
+    except Exception as e:
+        logger.error(f"Failed to create SessionManager: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to initialize session manager: {str(e)}")
 
 
-@router.post("/create", response_model=SessionResponse)
+@router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(
     request: SessionCreateRequest,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionResponse:
-    """Create a new session."""
+    """Create a new session from a config.
+
+    Args:
+        request: Session creation request with config_id
+
+    Returns:
+        SessionResponse: The created session
+
+    Raises:
+        HTTPException: 404 if config not found, 500 on other errors
+    """
     try:
-        session = await manager.create_session(
-            bundle=request.bundle,
-            provider=request.provider,
-            model=request.model,
-            config=request.config,
-            metadata=request.metadata,
-        )
+        session = await manager.create_session(config_id=request.config_id)
 
         return SessionResponse(
             session_id=session.session_id,
+            config_id=session.config_id,
             status=session.status,
-            metadata=session.metadata.model_dump(),
             message="Session created successfully",
         )
+    except ValueError as e:
+        # Config not found
+        logger.info(f"Config not found for session creation: {e}")
+        raise HTTPException(status_code=404, detail=f"Config not found: {request.config_id}")
     except Exception as e:
-        logger.error(f"Error creating session: {e}")
+        logger.error(f"Error creating session: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -61,16 +80,23 @@ async def list_sessions(
     offset: int = 0,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionListResponse:
-    """List all sessions."""
+    """List all sessions.
+
+    Args:
+        limit: Maximum number of sessions to return
+        offset: Offset for pagination
+
+    Returns:
+        SessionListResponse: List of session information
+    """
     try:
         sessions = await manager.list_sessions(limit=limit, offset=offset)
 
         session_infos = [
             SessionInfo(
                 session_id=s.session_id,
+                config_id=s.config_id,
                 status=s.status,
-                bundle=s.metadata.bundle,
-                provider=s.metadata.provider,
                 message_count=s.metadata.message_count,
                 created_at=s.metadata.created_at,
                 updated_at=s.metadata.updated_at,
@@ -89,15 +115,25 @@ async def get_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionResponse:
-    """Get session details."""
+    """Get session details.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        SessionResponse: Session details
+
+    Raises:
+        HTTPException: 404 if not found
+    """
     session = await manager.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     return SessionResponse(
         session_id=session.session_id,
+        config_id=session.config_id,
         status=session.status,
-        metadata=session.metadata.model_dump(),
     )
 
 
@@ -119,17 +155,33 @@ async def resume_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionResponse:
-    """Resume an existing session."""
-    session = await manager.resume_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    """Resume an existing session.
 
-    return SessionResponse(
-        session_id=session.session_id,
-        status=session.status,
-        metadata=session.metadata.model_dump(),
-        message="Session resumed successfully",
-    )
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        SessionResponse: The resumed session
+
+    Raises:
+        HTTPException: 404 if not found, 500 on resume errors
+    """
+    try:
+        session = await manager.resume_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        return SessionResponse(
+            session_id=session.session_id,
+            config_id=session.config_id,
+            status=session.status,
+            message="Session resumed successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resuming session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{session_id}/messages", response_model=MessageResponse)

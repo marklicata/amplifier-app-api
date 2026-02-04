@@ -8,11 +8,8 @@ from pydantic import BaseModel, Field
 class SessionCreateRequest(BaseModel):
     """Request to create a new session."""
 
-    bundle: str | None = Field(default=None, description="Bundle name to use")
-    provider: str | None = Field(default=None, description="Provider to use")
-    model: str | None = Field(default=None, description="Model name")
-    config: dict[str, Any] = Field(default_factory=dict, description="Additional config")
-    metadata: dict[str, str] = Field(default_factory=dict, description="Session metadata tags")
+    config_id: str = Field(..., description="Config ID to use for this session")
+    tags: dict[str, str] = Field(default_factory=dict, description="Session metadata tags")
 
 
 class MessageRequest(BaseModel):

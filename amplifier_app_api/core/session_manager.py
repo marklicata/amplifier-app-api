@@ -10,6 +10,7 @@ from typing import Any
 from ..config import settings
 from ..models import Session, SessionMetadata, SessionStatus
 from ..storage import Database
+from .config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,123 +21,134 @@ class SessionManager:
     def __init__(self, db: Database):
         """Initialize session manager."""
         self.db = db
+        self.config_manager = ConfigManager(db)
         self._sessions: dict[str, Any] = {}  # Active AmplifierSession instances
-        self._prepared_bundles: dict[str, Any] = {}  # Cached prepared bundles
+        self._prepared_bundles: dict[str, Any] = {}  # Cached prepared bundles by config_id
 
-        # Add local fork paths to Python path
-        self._setup_amplifier_paths()
-
-        # Import after paths are set up
+        # Import amplifier modules (will use installed packages from pyproject.toml)
         self._import_amplifier_modules()
 
-    def _setup_amplifier_paths(self) -> None:
-        """Add local amplifier-core and amplifier-foundation to Python path."""
-        core_path = settings.amplifier_core_path.resolve()
-        foundation_path = settings.amplifier_foundation_path.resolve()
-
-        if core_path.exists():
-            sys.path.insert(0, str(core_path))
-            logger.info(f"Added amplifier-core to path: {core_path}")
-        else:
-            logger.warning(f"amplifier-core path not found: {core_path}")
-
-        if foundation_path.exists():
-            sys.path.insert(0, str(foundation_path))
-            logger.info(f"Added amplifier-foundation to path: {foundation_path}")
-        else:
-            logger.warning(f"amplifier-foundation path not found: {foundation_path}")
-
     def _import_amplifier_modules(self) -> None:
-        """Import amplifier modules after paths are set up."""
+        """Import amplifier modules from installed packages."""
         try:
             from amplifier_core import AmplifierSession  # type: ignore[import-not-found]
             from amplifier_foundation import BundleRegistry  # type: ignore[import-not-found]
 
             self.AmplifierSession = AmplifierSession
+            self.BundleRegistry = BundleRegistry
 
             # Create a BundleRegistry for loading bundles
-            # Register the local foundation fork so 'foundation' resolves locally
-            foundation_path = settings.amplifier_foundation_path.resolve()
             self.registry = BundleRegistry()
 
-            # Register foundation bundle from local fork
-            self.registry.register(
-                uri=str(foundation_path),
-                name="foundation",
-                explicitly_requested=True,
-            )
-
-            logger.info("Successfully imported amplifier-core and amplifier-foundation")
-            logger.info(f"Registered foundation bundle at: {foundation_path}")
+            logger.info("Successfully imported amplifier-core and amplifier-foundation from installed packages")
         except ImportError as e:
             logger.error(f"Failed to import amplifier modules: {e}")
             raise RuntimeError(
                 "Could not import amplifier-core or amplifier-foundation. "
-                "Check that local forks are available at configured paths."
+                "Ensure they are installed via 'uv sync'."
             ) from e
 
-    async def _get_or_prepare_bundle(self, bundle_name: str) -> Any:
-        """Get or prepare a bundle by name."""
-        if bundle_name in self._prepared_bundles:
-            logger.info(f"Using cached bundle: {bundle_name}")
-            return self._prepared_bundles[bundle_name]
+    async def _get_or_prepare_config_bundle(self, config_id: str) -> Any:
+        """Get or prepare a bundle from a config YAML.
 
-        # Load bundle using the registry
-        logger.info(f"Loading bundle via registry: {bundle_name}")
+        Args:
+            config_id: Config identifier
+
+        Returns:
+            Prepared bundle ready to create sessions
+
+        Raises:
+            ValueError: If config not found or YAML is invalid
+            RuntimeError: If bundle preparation fails
+        """
+        if config_id in self._prepared_bundles:
+            logger.info(f"Using cached bundle for config: {config_id}")
+            return self._prepared_bundles[config_id]
+
+        # Get config from database
+        config = await self.config_manager.get_config(config_id)
+        if not config:
+            raise ValueError(f"Config not found: {config_id}")
 
         try:
-            # Load through registry
-            bundle = await asyncio.wait_for(
-                self.registry._load_single(bundle_name, auto_register=True, auto_include=True),
-                timeout=60.0,  # Give time for remote bundle downloads
-            )
-            logger.info(f"Bundle loaded: {bundle.name}")
+            # Parse YAML string to dict
+            config_dict = self.config_manager.parse_yaml(config.yaml_content)
+            logger.info(f"Parsed YAML for config: {config_id}")
 
-            logger.info(f"Preparing bundle: {bundle_name}")
-            prepared = await asyncio.wait_for(bundle.prepare(), timeout=30.0)
-            logger.info(f"Bundle prepared: {bundle_name}")
+            # Extract markdown body if present (after YAML frontmatter)
+            # Config YAML can be:
+            # 1. Pure YAML (no frontmatter separator)
+            # 2. YAML frontmatter + markdown body (separated by "---")
+            instruction = None
+            if config.yaml_content.startswith("---"):
+                # Has frontmatter - extract markdown body
+                parts = config.yaml_content.split("---", 2)
+                if len(parts) > 2:
+                    instruction = parts[2].strip()
 
-            # Cache it
-            self._prepared_bundles[bundle_name] = prepared
-            logger.info(f"Bundle cached: {bundle_name}")
+            # Import Bundle class
+            from amplifier_foundation import Bundle  # type: ignore[import-not-found]
+
+            # Create Bundle from dict (no temp file needed!)
+            bundle = Bundle.from_dict(config_dict, base_path=Path.cwd())
+
+            # Set instruction (markdown body) if present
+            if instruction:
+                bundle.instruction = instruction
+
+            logger.info(f"Created Bundle from config dict: {config_id}")
+
+            # Prepare bundle (resolves includes, loads modules, creates mount plan)
+            logger.info(f"Preparing bundle for config: {config_id}")
+            prepared = await asyncio.wait_for(bundle.prepare(install_deps=True), timeout=60.0)
+            logger.info(f"Bundle prepared for config: {config_id}")
+
+            # Cache prepared bundle for reuse
+            self._prepared_bundles[config_id] = prepared
+            logger.info(f"Bundle cached for config: {config_id}")
 
             return prepared
 
         except TimeoutError:
-            logger.error(f"Bundle loading timed out: {bundle_name}")
+            logger.error(f"Bundle preparation timed out for config: {config_id}")
             raise RuntimeError(
-                f"Bundle '{bundle_name}' loading timed out. "
+                f"Config '{config_id}' bundle preparation timed out. "
                 "This may be due to network issues downloading remote dependencies."
             )
         except Exception as e:
-            logger.error(f"Bundle loading failed: {bundle_name}: {e}")
-            raise
+            logger.error(f"Bundle preparation failed for config {config_id}: {e}")
+            raise RuntimeError(f"Failed to prepare bundle from config: {e}") from e
 
     async def create_session(
         self,
-        bundle: str | None = None,
-        provider: str | None = None,
-        model: str | None = None,
-        config: dict[str, Any] | None = None,
-        metadata: dict[str, str] | None = None,
+        config_id: str,
     ) -> Session:
-        """Create a new Amplifier session.
+        """Create a new Amplifier session from a config.
 
-        Loads the bundle and creates AmplifierSession immediately.
+        Args:
+            config_id: Config identifier to use for this session
+
+        Returns:
+            Session: The created session
+
+        Raises:
+            ValueError: If config not found
+            RuntimeError: If session creation fails
         """
         session_id = str(uuid.uuid4())
-        bundle_name = bundle or "foundation"
+
+        # Verify config exists
+        config = await self.config_manager.get_config(config_id)
+        if not config:
+            raise ValueError(f"Config not found: {config_id}")
 
         # Create metadata
         session_metadata = SessionMetadata(
-            bundle=bundle_name,
-            provider=provider,
-            model=model,
-            tags=metadata or {},
+            config_id=config_id,
         )
 
-        # Load and prepare the bundle, create AmplifierSession
-        prepared_bundle = await self._get_or_prepare_bundle(bundle_name)
+        # Load and prepare the bundle from config YAML
+        prepared_bundle = await self._get_or_prepare_config_bundle(config_id)
 
         # Create the actual AmplifierSession
         amplifier_session = await prepared_bundle.create_session(
@@ -152,23 +164,19 @@ class SessionManager:
         # Store in database
         await self.db.create_session(
             session_id=session_id,
+            config_id=config_id,
             status=SessionStatus.ACTIVE.value,
-            bundle=bundle_name,
-            provider=provider,
-            model=model,
-            metadata=session_metadata.model_dump(),
-            config=config or {},
         )
 
         # Create session object
         session = Session(
             session_id=session_id,
+            config_id=config_id,
             status=SessionStatus.ACTIVE,
             metadata=session_metadata,
-            config=config or {},
         )
 
-        logger.info(f"Created session: {session_id}")
+        logger.info(f"Created session: {session_id} from config: {config_id}")
         return session
 
     async def get_session(self, session_id: str) -> Session | None:
@@ -177,12 +185,20 @@ class SessionManager:
         if not session_data:
             return None
 
+        # Get config_id to build metadata
+        config_id = session_data["config_id"]
+
         return Session(
             session_id=session_data["session_id"],
+            config_id=config_id,
             status=SessionStatus(session_data["status"]),
-            metadata=SessionMetadata(**session_data["metadata"]),
+            metadata=SessionMetadata(
+                config_id=config_id,
+                created_at=session_data["created_at"],
+                updated_at=session_data["updated_at"],
+                message_count=session_data["message_count"],
+            ),
             transcript=session_data["transcript"],
-            config=session_data["config"],
         )
 
     async def list_sessions(self, limit: int = 50, offset: int = 0) -> list[Session]:
@@ -191,11 +207,10 @@ class SessionManager:
         return [
             Session(
                 session_id=s["session_id"],
+                config_id=s["config_id"],
                 status=SessionStatus(s["status"]),
                 metadata=SessionMetadata(
-                    bundle=s.get("bundle"),
-                    provider=s.get("provider"),
-                    model=s.get("model"),
+                    config_id=s["config_id"],
                     created_at=s["created_at"],
                     updated_at=s["updated_at"],
                     message_count=s["message_count"],
@@ -238,8 +253,7 @@ class SessionManager:
             # Try to resume the session if it's not in memory
             logger.info(f"Session {session_id} not in memory, attempting to resume")
             try:
-                bundle_name = session.metadata.bundle or "foundation"
-                prepared_bundle = await self._get_or_prepare_bundle(bundle_name)
+                prepared_bundle = await self._get_or_prepare_config_bundle(session.config_id)
 
                 # Create session with existing transcript
                 amplifier_session = await prepared_bundle.create_session(
@@ -287,8 +301,7 @@ class SessionManager:
                 "session_id": session_id,
                 "response": response_text,
                 "metadata": {
-                    "provider": session.metadata.provider,
-                    "model": session.metadata.model,
+                    "config_id": session.config_id,
                 },
             }
 
@@ -305,8 +318,7 @@ class SessionManager:
         # Load the session into memory if not already there
         if session_id not in self._sessions:
             try:
-                bundle_name = session.metadata.bundle or "foundation"
-                prepared_bundle = await self._get_or_prepare_bundle(bundle_name)
+                prepared_bundle = await self._get_or_prepare_config_bundle(session.config_id)
 
                 amplifier_session = await prepared_bundle.create_session(
                     session_id=session_id,
@@ -354,8 +366,7 @@ class SessionManager:
         if not amplifier_session:
             logger.info(f"Session {session_id} not in memory, attempting to resume")
             try:
-                bundle_name = session.metadata.bundle or "foundation"
-                prepared_bundle = await self._get_or_prepare_bundle(bundle_name)
+                prepared_bundle = await self._get_or_prepare_config_bundle(session.config_id)
 
                 amplifier_session = await prepared_bundle.create_session(
                     session_id=session_id,
