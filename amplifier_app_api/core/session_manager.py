@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -21,12 +20,27 @@ class SessionManager:
     def __init__(self, db: Database):
         """Initialize session manager."""
         self.db = db
-        self.config_manager = ConfigManager(db)
+        self.config_manager = ConfigManager(
+            db, session_manager=self
+        )  # Pass self for cache invalidation
         self._sessions: dict[str, Any] = {}  # Active AmplifierSession instances
         self._prepared_bundles: dict[str, Any] = {}  # Cached prepared bundles by config_id
 
         # Import amplifier modules (will use installed packages from pyproject.toml)
         self._import_amplifier_modules()
+
+    def invalidate_config_cache(self, config_id: str) -> None:
+        """Invalidate cached prepared bundle for a config.
+
+        Call this when a config's YAML is updated to ensure
+        new sessions use the updated configuration.
+
+        Args:
+            config_id: Config identifier to invalidate
+        """
+        if config_id in self._prepared_bundles:
+            del self._prepared_bundles[config_id]
+            logger.info(f"Invalidated bundle cache for config: {config_id}")
 
     def _import_amplifier_modules(self) -> None:
         """Import amplifier modules from installed packages."""
@@ -40,7 +54,9 @@ class SessionManager:
             # Create a BundleRegistry for loading bundles
             self.registry = BundleRegistry()
 
-            logger.info("Successfully imported amplifier-core and amplifier-foundation from installed packages")
+            logger.info(
+                "Successfully imported amplifier-core and amplifier-foundation from installed packages"
+            )
         except ImportError as e:
             logger.error(f"Failed to import amplifier modules: {e}")
             raise RuntimeError(

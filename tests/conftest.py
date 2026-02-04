@@ -36,16 +36,15 @@ def mock_session_manager():
 
     manager = Mock()
 
-    # Mock create_session
-    async def mock_create(bundle=None, provider=None, model=None, config=None, metadata=None):
+    # Mock create_session (new signature: just config_id)
+    async def mock_create(config_id):
         session_id = "mock-session-123"
         return Session(
             session_id=session_id,
+            config_id=config_id,
             status=SessionStatus.ACTIVE,
             metadata=SessionMetadata(
-                bundle=bundle or "foundation",
-                provider=provider,
-                model=model,
+                config_id=config_id,
             ),
         )
 
@@ -57,12 +56,13 @@ def mock_session_manager():
         return_value={
             "session_id": "mock-123",
             "response": "Mock response",
-            "metadata": {},
+            "metadata": {"config_id": "mock-config-id"},
         }
     )
     manager.resume_session = AsyncMock(return_value=None)
     manager.get_amplifier_session = AsyncMock(return_value=None)
     manager.stream_message = AsyncMock(return_value=iter([]))  # Empty async generator
+    manager.invalidate_config_cache = Mock()  # For cache invalidation
 
     return manager
 
@@ -151,10 +151,34 @@ async def client(test_db, mock_session_manager, mock_tool_manager):
 @pytest.fixture(scope="function")
 async def session_id(client):
     """Create a test session and return its ID."""
-    response = await client.post(
-        "/sessions/create",
-        json={"bundle": "foundation"},
+    # First create a config
+    config_response = await client.post(
+        "/configs",
+        json={
+            "name": "test-config",
+            "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+        },
     )
-    if response.status_code == 200:
-        return response.json()["session_id"]
+    if config_response.status_code != 200:
+        return None
+
+    config_id = config_response.json()["config_id"]
+
+    # Then create session from config
+    session_response = await client.post("/sessions", json={"config_id": config_id})
+    if session_response.status_code == 200:
+        return session_response.json()["session_id"]
     return None

@@ -25,7 +25,34 @@ class TestStressLoad:
     async def test_rapid_session_creation(self):
         """Test creating many sessions rapidly."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            tasks = [client.post("/sessions/create", json={}) for _ in range(20)]
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-stress",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
+            tasks = [client.post("/sessions", json={"config_id": config_id}) for _ in range(20)]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Count successes
@@ -55,9 +82,36 @@ class TestStressLoad:
     async def test_session_list_with_many_sessions(self):
         """Test listing sessions when many exist."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-many",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create 50 sessions
             for i in range(50):
-                await client.post("/sessions/create", json={})
+                await client.post("/sessions", json={"config_id": config_id})
 
             # List them
             response = await client.get("/sessions?limit=100")
@@ -86,9 +140,36 @@ class TestStressMemory:
     async def test_session_cleanup_works(self):
         """Test that session cleanup prevents unbounded growth."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-cleanup",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create and delete 20 sessions
             for _ in range(20):
-                create_resp = await client.post("/sessions/create", json={})
+                create_resp = await client.post("/sessions", json={"config_id": config_id})
                 if create_resp.status_code == 200:
                     session_id = create_resp.json()["session_id"]
                     await client.delete(f"/sessions/{session_id}")

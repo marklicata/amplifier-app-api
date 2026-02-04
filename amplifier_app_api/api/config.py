@@ -24,22 +24,52 @@ async def get_config_manager(db: Database = Depends(get_db)) -> ConfigManager:
     return ConfigManager(db)
 
 
-@router.post("", response_model=ConfigResponse, status_code=201)
+@router.post(
+    "",
+    response_model=ConfigResponse,
+    status_code=201,
+    summary="Create a new config",
+    description="""
+Create a new config (complete YAML bundle).
+
+A config contains everything needed to start an Amplifier session:
+- Tools, providers, hooks
+- Session configuration (orchestrator, context manager)
+- Agents, spawn policies
+- All includes and dependencies
+
+Configs are reusable - create once, use for multiple sessions.
+
+The YAML content is validated for:
+- Valid YAML syntax
+- Required sections: bundle, session, providers
+- Required fields: bundle.name, session.orchestrator, session.context
+
+Example minimal config:
+```yaml
+bundle:
+  name: my-config
+
+includes:
+  - bundle: foundation
+
+session:
+  orchestrator: loop-basic
+  context: context-simple
+
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: ${ANTHROPIC_API_KEY}
+      model: claude-sonnet-4-5
+```
+""",
+)
 async def create_config(
     request: ConfigCreateRequest,
     manager: ConfigManager = Depends(get_config_manager),
 ) -> ConfigResponse:
-    """Create a new config.
-
-    Args:
-        request: Config creation request with name, YAML content, etc.
-
-    Returns:
-        ConfigResponse: The created config
-
-    Raises:
-        HTTPException: 400 if YAML is invalid, 500 on other errors
-    """
+    """Create a new config with YAML validation."""
     try:
         config = await manager.create_config(
             name=request.name,

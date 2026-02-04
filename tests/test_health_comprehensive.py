@@ -185,7 +185,7 @@ class TestErrorHandling:
         """Test 405 for wrong HTTP method."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # GET on POST-only endpoint
-            response = await client.get("/sessions/create")
+            response = await client.get("/configs")
             assert response.status_code == 405
 
     async def test_422_for_invalid_request_body(self):

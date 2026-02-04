@@ -119,10 +119,39 @@ class TestE2ESessionEndpoints:
     """Test all 8 session endpoints."""
 
     def test_create_session(self, live_service):
-        """POST /sessions/create"""
+        """POST /sessions"""
+        # First create a config
+        config_response = httpx.post(
+            f"{live_service}/configs",
+            json={
+                "name": "test-config",
+                "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+            },
+            timeout=10.0,
+        )
+        
+        if config_response.status_code != 200:
+            return None
+            
+        config_id = config_response.json()["config_id"]
+        
+        # Then create session from config
         response = httpx.post(
-            f"{live_service}/sessions/create",
-            json={"bundle": "foundation"},
+            f"{live_service}/sessions",
+            json={"config_id": config_id},
             timeout=10.0,
         )
         # May return 200 (success) or 500 (amplifier-core loading failed)
@@ -133,6 +162,7 @@ class TestE2ESessionEndpoints:
             data = response.json()
             assert "session_id" in data
             assert "status" in data
+            assert "config_id" in data
             return data["session_id"]
         return None
 
@@ -337,7 +367,7 @@ class TestE2EErrorHandling:
 
     def test_405_wrong_method(self, live_service):
         """Test 405 for wrong HTTP method."""
-        response = httpx.get(f"{live_service}/sessions/create", timeout=5.0)
+        response = httpx.get(f"{live_service}/configs", timeout=5.0)
         assert response.status_code == 405
 
     def test_422_validation_error(self, live_service):
@@ -352,7 +382,7 @@ class TestE2EErrorHandling:
     def test_malformed_json(self, live_service):
         """Test handling of malformed JSON."""
         response = httpx.post(
-            f"{live_service}/sessions/create",
+            f"{live_service}/sessions",
             content="not-valid-json",
             headers={"Content-Type": "application/json"},
             timeout=5.0,
@@ -431,7 +461,7 @@ class TestE2EEndpointCoverage:
     def test_all_session_endpoints_exist(self, live_service):
         """Verify all 8 session endpoints are accessible."""
         endpoints = [
-            ("POST", "/sessions/create", {"bundle": "foundation"}),
+            ("POST", "/sessions", {"config_id": "test-config"}),
             ("GET", "/sessions", None),
             ("GET", "/sessions/test-id", None),  # Will 404
             ("DELETE", "/sessions/test-id", None),  # Will 404

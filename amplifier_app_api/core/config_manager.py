@@ -3,12 +3,16 @@
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
 from ..models import Config, ConfigMetadata
 from ..storage import Database
+from .config_validator import ConfigValidator
+
+if TYPE_CHECKING:
+    from .session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +20,25 @@ logger = logging.getLogger(__name__)
 class ConfigManager:
     """Manages Amplifier configurations (complete YAML bundles)."""
 
-    def __init__(self, db: Database):
-        """Initialize configuration manager."""
+    def __init__(self, db: Database, session_manager: "SessionManager | None" = None):
+        """Initialize configuration manager.
+
+        Args:
+            db: Database instance
+            session_manager: Optional SessionManager for cache invalidation
+        """
         self.db = db
+        self._session_manager = session_manager
+
+    def set_session_manager(self, session_manager: "SessionManager") -> None:
+        """Set the session manager for cache invalidation.
+
+        This is called after SessionManager is created to avoid circular dependency.
+
+        Args:
+            session_manager: SessionManager instance
+        """
+        self._session_manager = session_manager
 
     async def create_config(
         self,
@@ -26,6 +46,7 @@ class ConfigManager:
         yaml_content: str,
         description: str | None = None,
         tags: dict[str, str] | None = None,
+        validate: bool = True,
     ) -> Config:
         """Create a new config.
 
@@ -34,22 +55,28 @@ class ConfigManager:
             yaml_content: Complete YAML bundle content
             description: Optional description
             tags: Optional tags for categorization
+            validate: Whether to validate config structure (default: True)
 
         Returns:
             Config: The created config
 
         Raises:
-            ValueError: If YAML is invalid
+            ValueError: If YAML syntax is invalid
+            ConfigValidationError: If config structure is invalid
         """
         config_id = str(uuid.uuid4())
 
-        # Validate YAML syntax and structure
+        # Validate YAML syntax
         try:
             parsed = yaml.safe_load(yaml_content)
             if not isinstance(parsed, dict):
                 raise ValueError("YAML content must be a dictionary/object, not a scalar value")
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML: {e}") from e
+            raise ValueError(f"Invalid YAML syntax: {e}") from e
+
+        # Validate config structure
+        if validate:
+            ConfigValidator.validate(parsed)
 
         config = Config(
             config_id=config_id,
@@ -127,7 +154,10 @@ class ConfigManager:
                 if not isinstance(parsed, dict):
                     raise ValueError("YAML content must be a dictionary/object, not a scalar value")
             except yaml.YAMLError as e:
-                raise ValueError(f"Invalid YAML: {e}") from e
+                raise ValueError(f"Invalid YAML syntax: {e}") from e
+
+            # Validate config structure
+            ConfigValidator.validate(parsed)
 
         # Update fields
         updates: dict[str, Any] = {"updated_at": datetime.now(UTC)}
@@ -141,6 +171,11 @@ class ConfigManager:
             updates["tags"] = tags
 
         await self.db.update_config(config_id, **updates)
+
+        # Invalidate bundle cache if YAML content changed
+        if yaml_content is not None and self._session_manager:
+            self._session_manager.invalidate_config_cache(config_id)
+            logger.info(f"Invalidated bundle cache for config: {config_id}")
 
         logger.info(f"Updated config: {config_id}")
         return await self.get_config(config_id)

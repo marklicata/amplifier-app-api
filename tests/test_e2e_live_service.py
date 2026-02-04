@@ -107,9 +107,38 @@ class TestLiveServiceSessions:
 
     def test_create_session_real_http(self, live_service):
         """Test creating a session with real HTTP."""
+        # First create a config
+        config_response = httpx.post(
+            f"{live_service}/configs",
+            json={
+                "name": "test-config",
+                "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+            },
+            timeout=30.0,
+        )
+
+        if config_response.status_code != 200:
+            return
+
+        config_id = config_response.json()["config_id"]
+
+        # Then create session from config
         response = httpx.post(
-            f"{live_service}/sessions/create",
-            json={"bundle": "foundation"},
+            f"{live_service}/sessions",
+            json={"config_id": config_id},
             timeout=30.0,
         )
         # May succeed or fail depending on amplifier-core setup
@@ -118,6 +147,7 @@ class TestLiveServiceSessions:
             data = response.json()
             assert "session_id" in data
             assert "status" in data
+            assert "config_id" in data
 
     def test_list_sessions_real_http(self, live_service):
         """Test listing sessions with real HTTP."""
@@ -233,7 +263,7 @@ class TestLiveServiceErrorHandling:
 
     def test_405_for_wrong_method(self, live_service):
         """Test 405 for wrong HTTP method."""
-        response = httpx.get(f"{live_service}/sessions/create")
+        response = httpx.get(f"{live_service}/configs")
         assert response.status_code == 405
 
     def test_422_for_invalid_body(self, live_service):

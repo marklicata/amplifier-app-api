@@ -31,12 +31,56 @@ class ConfigMetadata(BaseModel):
 
 
 class ConfigCreateRequest(BaseModel):
-    """Request to create a new config."""
+    """Request to create a new config.
 
-    name: str
-    description: str | None = None
-    yaml_content: str  # Complete bundle YAML
-    tags: dict[str, str] = Field(default_factory=dict)
+    A config is a complete YAML bundle containing all components needed
+    to start an Amplifier session (tools, providers, orchestrator, etc.).
+    """
+
+    name: str = Field(
+        ...,
+        description="Human-readable name for the config",
+        examples=["development", "production", "my-custom-config"],
+    )
+    description: str | None = Field(
+        None,
+        description="Optional description of what this config is for",
+        examples=["Development configuration with Anthropic provider"],
+    )
+    yaml_content: str = Field(
+        ...,
+        description="Complete YAML bundle content with all sections (bundle, session, providers, tools, etc.)",
+        examples=[
+            """
+bundle:
+  name: dev-config
+  version: 1.0.0
+
+includes:
+  - bundle: foundation
+
+session:
+  orchestrator: loop-streaming
+  context: context-persistent
+
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: ${ANTHROPIC_API_KEY}
+      model: claude-sonnet-4-5
+
+tools:
+  - module: tool-filesystem
+  - module: tool-bash
+  - module: tool-web
+"""
+        ],
+    )
+    tags: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional tags for categorizing/filtering configs",
+        examples=[{"env": "dev", "team": "platform"}],
+    )
 
 
 class ConfigUpdateRequest(BaseModel):

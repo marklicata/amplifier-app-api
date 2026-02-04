@@ -22,7 +22,7 @@ class TestSessionModels:
 
     def test_session_metadata_defaults(self):
         """Test SessionMetadata with defaults."""
-        meta = SessionMetadata()
+        meta = SessionMetadata(config_id="test-config-id")
         assert meta.message_count == 0
         assert isinstance(meta.tags, dict)
         assert isinstance(meta.created_at, datetime)
@@ -30,14 +30,13 @@ class TestSessionModels:
     def test_session_metadata_with_values(self):
         """Test SessionMetadata with values."""
         meta = SessionMetadata(
-            bundle="foundation",
-            provider="anthropic",
-            model="claude-sonnet-4-5",
+            config_id="test-config-id",
             message_count=5,
+            tags={"project": "test"},
         )
-        assert meta.bundle == "foundation"
-        assert meta.provider == "anthropic"
+        assert meta.config_id == "test-config-id"
         assert meta.message_count == 5
+        assert meta.tags == {"project": "test"}
 
     def test_session_status_enum(self):
         """Test SessionStatus enum values."""
@@ -50,12 +49,14 @@ class TestSessionModels:
         """Test complete Session model."""
         session = Session(
             session_id="test-123",
+            config_id="test-config-id",
             status=SessionStatus.ACTIVE,
-            metadata=SessionMetadata(bundle="foundation"),
+            metadata=SessionMetadata(config_id="test-config-id"),
         )
         assert session.session_id == "test-123"
+        assert session.config_id == "test-config-id"
         assert session.status == SessionStatus.ACTIVE
-        assert session.metadata.bundle == "foundation"
+        assert session.metadata.config_id == "test-config-id"
 
     def test_session_with_transcript(self):
         """Test Session with transcript."""
@@ -74,23 +75,24 @@ class TestRequestModels:
     """Test request models validation."""
 
     def test_session_create_request_minimal(self):
-        """Test SessionCreateRequest with minimal data."""
-        request = SessionCreateRequest()
-        assert request.bundle is None
-        assert request.provider is None
-        assert isinstance(request.config, dict)
+        """Test SessionCreateRequest with required config_id."""
+        request = SessionCreateRequest(config_id="test-config-id")
+        assert request.config_id == "test-config-id"
+        assert isinstance(request.tags, dict)
 
-    def test_session_create_request_full(self):
-        """Test SessionCreateRequest with all fields."""
+    def test_session_create_request_with_tags(self):
+        """Test SessionCreateRequest with tags."""
         request = SessionCreateRequest(
-            bundle="foundation",
-            provider="anthropic",
-            model="claude-sonnet-4-5",
-            config={"debug": True},
-            metadata={"project": "test"},
+            config_id="test-config-id",
+            tags={"project": "test", "env": "dev"},
         )
-        assert request.bundle == "foundation"
-        assert request.config["debug"] is True
+        assert request.config_id == "test-config-id"
+        assert request.tags["project"] == "test"
+
+    def test_session_create_request_missing_config_id(self):
+        """Test SessionCreateRequest without config_id fails."""
+        with pytest.raises(ValidationError):
+            SessionCreateRequest()
 
     def test_message_request_valid(self):
         """Test MessageRequest with valid data."""
@@ -173,25 +175,31 @@ class TestModelSerialization:
         """Test Session deserialization from dict."""
         data = {
             "session_id": "test-123",
+            "config_id": "test-config-id",
             "status": "active",
             "metadata": {
-                "bundle": "foundation",
+                "config_id": "test-config-id",
                 "created_at": datetime.now(UTC),
                 "updated_at": datetime.now(UTC),
                 "message_count": 0,
                 "tags": {},
             },
             "transcript": [],
-            "config": {},
         }
         session = Session(**data)
         assert session.session_id == "test-123"
+        assert session.config_id == "test-config-id"
 
     def test_session_json_serialization(self):
         """Test Session JSON serialization."""
-        session = Session(session_id="test-123")
+        session = Session(
+            session_id="test-123",
+            config_id="test-config-id",
+            metadata=SessionMetadata(config_id="test-config-id"),
+        )
         json_str = session.model_dump_json()
         assert "test-123" in json_str
+        assert "test-config-id" in json_str
         assert isinstance(json_str, str)
 
 
@@ -203,6 +211,11 @@ class TestModelValidation:
         with pytest.raises(ValidationError):
             Session()
 
+    def test_session_config_id_required(self):
+        """Test config_id is required."""
+        with pytest.raises(ValidationError):
+            Session(session_id="test-123")
+
     def test_session_invalid_status(self):
         """Test invalid status value rejected."""
         with pytest.raises(ValidationError):
@@ -213,11 +226,11 @@ class TestModelValidation:
         request = MessageRequest(message="")
         assert request.message == ""
 
-    def test_config_dict_types(self):
-        """Test config fields accept proper dict types."""
+    def test_tags_dict_types(self):
+        """Test tags fields accept proper dict types."""
         request = SessionCreateRequest(
-            config={"key": "value", "nested": {"a": 1}},
-            metadata={"tag1": "value1"},
+            config_id="test-config-id",
+            tags={"tag1": "value1", "tag2": "value2"},
         )
-        assert request.config["nested"]["a"] == 1
-        assert request.metadata["tag1"] == "value1"
+        assert request.tags["tag1"] == "value1"
+        assert request.tags["tag2"] == "value2"

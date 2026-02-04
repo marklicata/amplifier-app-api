@@ -33,29 +33,53 @@ async def get_session_manager(db: Database = Depends(get_db)) -> SessionManager:
         raise HTTPException(
             status_code=503,
             detail="Session service unavailable. Amplifier dependencies not configured. "
-                   "Please set AMPLIFIER_CORE_PATH and AMPLIFIER_FOUNDATION_PATH in .env file."
+            "Please set AMPLIFIER_CORE_PATH and AMPLIFIER_FOUNDATION_PATH in .env file.",
         )
     except Exception as e:
         logger.error(f"Failed to create SessionManager: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to initialize session manager: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to initialize session manager: {str(e)}"
+        )
 
 
-@router.post("", response_model=SessionResponse, status_code=201)
+@router.post(
+    "",
+    response_model=SessionResponse,
+    status_code=201,
+    summary="Create a new session from a config",
+    description="""
+Create a new Amplifier session from an existing config.
+
+A session is a lightweight runtime instance that:
+- References a config (complete YAML bundle) via config_id
+- Maintains conversation transcript
+- Tracks execution status
+- Stores runtime state
+
+Multiple sessions can be created from the same config, enabling:
+- Parallel conversations with same configuration
+- A/B testing different approaches
+- Isolated execution contexts
+
+The first session from a config prepares the bundle (slower).
+Subsequent sessions reuse the cached prepared bundle (faster).
+
+Requirements:
+- The config_id must exist (create via POST /configs first)
+- The config must have valid YAML with required sections
+
+Returns a unique session_id that can be used to:
+- Send messages (POST /sessions/{id}/messages)
+- Stream responses (POST /sessions/{id}/stream)
+- Resume later (POST /sessions/{id}/resume)
+- Delete when done (DELETE /sessions/{id})
+""",
+)
 async def create_session(
     request: SessionCreateRequest,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionResponse:
-    """Create a new session from a config.
-
-    Args:
-        request: Session creation request with config_id
-
-    Returns:
-        SessionResponse: The created session
-
-    Raises:
-        HTTPException: 404 if config not found, 500 on other errors
-    """
+    """Create a new session from a config."""
     try:
         session = await manager.create_session(config_id=request.config_id)
 
