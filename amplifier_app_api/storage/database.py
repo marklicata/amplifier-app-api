@@ -14,22 +14,30 @@ logger = logging.getLogger(__name__)
 
 # SQL Schema
 SCHEMA_SQL = """
--- Sessions table
+-- Configs table (stores complete YAML bundles)
+CREATE TABLE IF NOT EXISTS configs (
+    config_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    yaml_content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    tags TEXT
+);
+
+-- Sessions table (simplified - references config_id)
 CREATE TABLE IF NOT EXISTS sessions (
     session_id TEXT PRIMARY KEY,
+    config_id TEXT NOT NULL,
     status TEXT NOT NULL,
-    bundle TEXT,
-    provider TEXT,
-    model TEXT,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     message_count INTEGER DEFAULT 0,
-    metadata TEXT,
-    config TEXT,
-    transcript TEXT
+    transcript TEXT,
+    FOREIGN KEY (config_id) REFERENCES configs(config_id)
 );
 
--- Configuration table
+-- Configuration table (for app-level settings)
 CREATE TABLE IF NOT EXISTS configuration (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -38,6 +46,9 @@ CREATE TABLE IF NOT EXISTS configuration (
 );
 
 -- Create indexes
+CREATE INDEX IF NOT EXISTS idx_configs_name ON configs(name);
+CREATE INDEX IF NOT EXISTS idx_configs_created_at ON configs(created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_config_id ON sessions(config_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
 CREATE INDEX IF NOT EXISTS idx_config_scope ON configuration(scope);
@@ -57,9 +68,10 @@ class Database:
         """Establish database connection and initialize schema."""
         if self._connection is None:
             self._connection = await aiosqlite.connect(str(self.db_path))
-            self._connection.row_factory = aiosqlite.Row
-            await self._initialize_schema()
-            logger.info(f"Database connected: {self.db_path}")
+            if self._connection:  # Type guard
+                self._connection.row_factory = aiosqlite.Row
+                await self._initialize_schema()
+                logger.info(f"Database connected: {self.db_path}")
 
     async def disconnect(self) -> None:
         """Close database connection."""
@@ -79,12 +91,8 @@ class Database:
     async def create_session(
         self,
         session_id: str,
+        config_id: str,
         status: str,
-        bundle: str | None = None,
-        provider: str | None = None,
-        model: str | None = None,
-        metadata: dict[str, Any] | None = None,
-        config: dict[str, Any] | None = None,
     ) -> None:
         """Create a new session."""
         if not self._connection:
@@ -92,39 +100,20 @@ class Database:
 
         now = datetime.now(UTC)
 
-        # Serialize metadata to JSON (handles datetime objects)
-        def serialize_for_json(obj):
-            """Convert object to JSON-serializable format."""
-            if isinstance(obj, dict):
-                return {k: serialize_for_json(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [serialize_for_json(item) for item in obj]
-            elif isinstance(obj, datetime):
-                return obj.isoformat()
-            return obj
-
-        metadata_json = json.dumps(serialize_for_json(metadata or {}))
-        config_json = json.dumps(config or {})
-
         await self._connection.execute(
             """
             INSERT INTO sessions (
-                session_id, status, bundle, provider, model,
-                created_at, updated_at, message_count,
-                metadata, config, transcript
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                session_id, config_id, status,
+                created_at, updated_at, message_count, transcript
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session_id,
+                config_id,
                 status,
-                bundle,
-                provider,
-                model,
                 now,
                 now,
                 0,
-                metadata_json,
-                config_json,
                 json.dumps([]),
             ),
         )
@@ -144,15 +133,11 @@ class Database:
         if row:
             return {
                 "session_id": row["session_id"],
+                "config_id": row["config_id"],
                 "status": row["status"],
-                "bundle": row["bundle"],
-                "provider": row["provider"],
-                "model": row["model"],
                 "created_at": datetime.fromisoformat(row["created_at"]),
                 "updated_at": datetime.fromisoformat(row["updated_at"]),
                 "message_count": row["message_count"],
-                "metadata": json.loads(row["metadata"]) if row["metadata"] else {},
-                "config": json.loads(row["config"]) if row["config"] else {},
                 "transcript": json.loads(row["transcript"]) if row["transcript"] else [],
             }
         return None
@@ -164,7 +149,7 @@ class Database:
 
         cursor = await self._connection.execute(
             """
-            SELECT session_id, status, bundle, provider, model,
+            SELECT session_id, config_id, status,
                    created_at, updated_at, message_count
             FROM sessions
             ORDER BY updated_at DESC
@@ -177,10 +162,8 @@ class Database:
         return [
             {
                 "session_id": row["session_id"],
+                "config_id": row["config_id"],
                 "status": row["status"],
-                "bundle": row["bundle"],
-                "provider": row["provider"],
-                "model": row["model"],
                 "created_at": datetime.fromisoformat(row["created_at"]),
                 "updated_at": datetime.fromisoformat(row["updated_at"]),
                 "message_count": row["message_count"],
@@ -243,9 +226,129 @@ class Database:
         logger.info(f"Cleaned up {deleted} old sessions (older than {days} days)")
         return deleted
 
-    # Configuration operations
-    async def get_config(self, key: str) -> Any | None:
-        """Get configuration value."""
+    # Config operations
+    async def create_config(
+        self,
+        config_id: str,
+        name: str,
+        yaml_content: str,
+        description: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> None:
+        """Create a new config."""
+        if not self._connection:
+            raise RuntimeError("Database not connected")
+
+        now = datetime.now(UTC)
+        tags_json = json.dumps(tags or {})
+
+        await self._connection.execute(
+            """
+            INSERT INTO configs (
+                config_id, name, description, yaml_content,
+                created_at, updated_at, tags
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (config_id, name, description, yaml_content, now, now, tags_json),
+        )
+        await self._connection.commit()
+        logger.debug(f"Created config: {config_id}")
+
+    async def get_config(self, config_id: str) -> dict[str, Any] | None:
+        """Get config by ID."""
+        if not self._connection:
+            raise RuntimeError("Database not connected")
+
+        cursor = await self._connection.execute(
+            "SELECT * FROM configs WHERE config_id = ?", (config_id,)
+        )
+        row = await cursor.fetchone()
+
+        if row:
+            return {
+                "config_id": row["config_id"],
+                "name": row["name"],
+                "description": row["description"],
+                "yaml_content": row["yaml_content"],
+                "created_at": datetime.fromisoformat(row["created_at"]),
+                "updated_at": datetime.fromisoformat(row["updated_at"]),
+                "tags": json.loads(row["tags"]) if row["tags"] else {},
+            }
+        return None
+
+    async def update_config(self, config_id: str, **kwargs) -> None:
+        """Update config fields."""
+        if not self._connection:
+            raise RuntimeError("Database not connected")
+
+        updates = ["updated_at = ?"]
+        params: list[Any] = [datetime.now(UTC)]
+
+        for key, value in kwargs.items():
+            if key == "tags":
+                updates.append(f"{key} = ?")
+                params.append(json.dumps(value))
+            else:
+                updates.append(f"{key} = ?")
+                params.append(value)
+
+        params.append(config_id)
+
+        await self._connection.execute(
+            f"UPDATE configs SET {', '.join(updates)} WHERE config_id = ?", tuple(params)
+        )
+        await self._connection.commit()
+        logger.debug(f"Updated config: {config_id}")
+
+    async def delete_config(self, config_id: str) -> None:
+        """Delete config."""
+        if not self._connection:
+            raise RuntimeError("Database not connected")
+
+        await self._connection.execute("DELETE FROM configs WHERE config_id = ?", (config_id,))
+        await self._connection.commit()
+        logger.debug(f"Deleted config: {config_id}")
+
+    async def list_configs(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """List all configs."""
+        if not self._connection:
+            raise RuntimeError("Database not connected")
+
+        cursor = await self._connection.execute(
+            """
+            SELECT config_id, name, description, created_at, updated_at, tags
+            FROM configs
+            ORDER BY updated_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        )
+        rows = await cursor.fetchall()
+
+        return [
+            {
+                "config_id": row["config_id"],
+                "name": row["name"],
+                "description": row["description"],
+                "created_at": datetime.fromisoformat(row["created_at"]),
+                "updated_at": datetime.fromisoformat(row["updated_at"]),
+                "tags": json.loads(row["tags"]) if row["tags"] else {},
+            }
+            for row in rows
+        ]
+
+    async def count_configs(self) -> int:
+        """Count total configs."""
+        if not self._connection:
+            raise RuntimeError("Database not connected")
+
+        cursor = await self._connection.execute("SELECT COUNT(*) as count FROM configs")
+        row = await cursor.fetchone()
+        return row["count"] if row else 0
+
+    # App-level settings operations (key-value pairs)
+    async def get_setting(self, key: str) -> Any | None:
+        """Get app-level setting value."""
         if not self._connection:
             raise RuntimeError("Database not connected")
 
@@ -255,8 +358,8 @@ class Database:
         row = await cursor.fetchone()
         return json.loads(row["value"]) if row else None
 
-    async def set_config(self, key: str, value: Any, scope: str = "global") -> None:
-        """Set configuration value."""
+    async def set_setting(self, key: str, value: Any, scope: str = "global") -> None:
+        """Set app-level setting value."""
         if not self._connection:
             raise RuntimeError("Database not connected")
 
@@ -272,10 +375,10 @@ class Database:
             (key, json.dumps(value), scope, datetime.now(UTC)),
         )
         await self._connection.commit()
-        logger.debug(f"Set config: {key}")
+        logger.debug(f"Set setting: {key}")
 
-    async def get_all_config(self) -> dict[str, Any]:
-        """Get all configuration."""
+    async def get_all_settings(self) -> dict[str, Any]:
+        """Get all app-level settings."""
         if not self._connection:
             raise RuntimeError("Database not connected")
 

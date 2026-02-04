@@ -56,8 +56,43 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 # Create FastAPI application
 app = FastAPI(
-    title="Amplifier App api",
-    description="REST API service for Amplifier AI development platform",
+    title="Amplifier App API",
+    description="""
+REST API service for Amplifier AI development platform.
+
+## Architecture
+
+The API is built around two core primitives:
+
+### Configs
+Complete YAML bundles that define everything needed to run an Amplifier session:
+- Tools, providers, hooks
+- Session configuration (orchestrator, context manager)
+- Agents, spawn policies
+- All includes and dependencies
+
+Configs are **reusable** - create once, use for multiple sessions.
+
+### Sessions
+Lightweight runtime instances that reference a Config:
+- Created from a config_id
+- Maintains conversation transcript
+- Tracks status and metadata
+
+## Typical Flow
+
+1. Create a Config with your YAML bundle → Get config_id
+2. Create Session(s) from config_id → Get session_id
+3. Send messages to session_id → Get AI responses
+
+## Key Features
+
+- **Config Reusability**: One config → unlimited sessions
+- **Bundle Caching**: Prepared bundles cached for fast session creation
+- **Programmatic Helpers**: Add tools/providers/bundles via API
+- **Type Safety**: Full Pydantic validation
+- **Cache Invalidation**: Automatic when configs are updated
+""",
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",

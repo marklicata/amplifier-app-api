@@ -74,7 +74,34 @@ class TestSmokeDataIntegrity:
     async def test_session_creation_returns_valid_id(self):
         """Test session creation returns valid UUID."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.post("/sessions/create", json={})
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-smoke",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
+            response = await client.post("/sessions", json={"config_id": config_id})
             if response.status_code == 200:
                 data = response.json()
                 session_id = data["session_id"]

@@ -19,9 +19,7 @@ class SessionStatus(str, Enum):
 class SessionMetadata(BaseModel):
     """Session metadata."""
 
-    bundle: str | None = None
-    provider: str | None = None
-    model: str | None = None
+    config_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     message_count: int = 0
@@ -29,12 +27,12 @@ class SessionMetadata(BaseModel):
 
 
 class Session(BaseModel):
-    """Session data model."""
+    """Session data model - simplified to reference a config."""
 
     model_config = {"use_enum_values": True}
 
     session_id: str
+    config_id: str  # References a Config
     status: SessionStatus = SessionStatus.ACTIVE
-    metadata: SessionMetadata = Field(default_factory=SessionMetadata)
+    metadata: SessionMetadata
     transcript: list[dict[str, Any]] = Field(default_factory=list)
-    config: dict[str, Any] = Field(default_factory=dict)

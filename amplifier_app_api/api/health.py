@@ -27,15 +27,25 @@ async def health_check(db: Database = Depends(get_db)) -> HealthResponse:
     db_connected = False
     try:
         # Simple test query
-        await db.get_all_config()
-        db_connected = True
+        config_cnt = await db.count_configs()
+        if config_cnt >= 0:
+            db_connected = True
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
+
+    seconds_total = uptime
+    # Calculate components
+    days = seconds_total // 86400  # Number of full days
+    seconds_remaining = seconds_total % 86400  # Remaining seconds after removing full days
+    hours = seconds_remaining // 3600  # Number of full hours
+    seconds_remaining = seconds_remaining % 3600  # Remaining seconds after removing full hours
+    minutes = seconds_remaining // 60  # Number of full minutes
+    seconds = seconds_remaining % 60  # Remaining seconds
 
     return HealthResponse(
         status="healthy" if db_connected else "degraded",
         version=__version__,
-        uptime_seconds=uptime,
+        uptime=f"Days: {int(days)}, Hours: {int(hours)}, Minutes: {int(minutes)}, Seconds: {int(seconds)}",
         database_connected=db_connected,
     )
 

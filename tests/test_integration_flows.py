@@ -13,10 +13,37 @@ class TestCompleteSessionFlow:
     async def test_create_send_delete_flow(self):
         """Test create session, send message, delete session."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create session
             create_response = await client.post(
-                "/sessions/create",
-                json={"bundle": "foundation"},
+                "/sessions",
+                json={"config_id": config_id},
             )
 
             if create_response.status_code == 200:
@@ -41,8 +68,35 @@ class TestCompleteSessionFlow:
     async def test_create_resume_send_flow(self):
         """Test create, resume, and send message flow."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-2",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create session
-            create_response = await client.post("/sessions/create", json={})
+            create_response = await client.post("/sessions", json={"config_id": config_id})
 
             if create_response.status_code == 200:
                 session_id = create_response.json()["session_id"]
@@ -65,8 +119,35 @@ class TestCompleteSessionFlow:
             list1 = await client.get("/sessions")
             initial_count = len(list1.json()["sessions"])
 
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-3",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create session
-            create_response = await client.post("/sessions/create", json={})
+            create_response = await client.post("/sessions", json={"config_id": config_id})
 
             if create_response.status_code == 200:
                 # List again
@@ -132,10 +213,35 @@ class TestConcurrency:
     async def test_concurrent_session_creation(self):
         """Test creating multiple sessions concurrently."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-concurrent",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create 5 sessions concurrently
-            tasks = [
-                client.post("/sessions/create", json={"bundle": "foundation"}) for _ in range(5)
-            ]
+            tasks = [client.post("/sessions", json={"config_id": config_id}) for _ in range(5)]
 
             import asyncio
 
@@ -181,10 +287,37 @@ class TestDataPersistence:
     async def test_session_persists_after_creation(self):
         """Test session data persists in database."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # First create a config
+            config_response = await client.post(
+                "/configs",
+                json={
+                    "name": "test-config-persist",
+                    "yaml_content": """
+bundle:
+  name: test
+includes:
+  - bundle: foundation
+session:
+  orchestrator: loop-basic
+  context: context-simple
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: test-key
+      model: claude-sonnet-4-5
+""",
+                },
+            )
+
+            if config_response.status_code != 200:
+                return
+
+            config_id = config_response.json()["config_id"]
+
             # Create session
             create_response = await client.post(
-                "/sessions/create",
-                json={"bundle": "foundation", "provider": "anthropic"},
+                "/sessions",
+                json={"config_id": config_id},
             )
 
             if create_response.status_code == 200:
@@ -197,8 +330,7 @@ class TestDataPersistence:
                 # Verify metadata preserved
                 data = get_response.json()
                 assert data["session_id"] == session_id
-                assert data["metadata"]["bundle"] == "foundation"
-                assert data["metadata"]["provider"] == "anthropic"
+                assert data["config_id"] == config_id
 
     async def test_config_persists_after_update(self):
         """Test configuration persists after update."""

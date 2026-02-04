@@ -175,7 +175,7 @@ class TestEdgeCases:
         """Test sending malformed JSON."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
-                "/sessions/create",
+                "/sessions",
                 content="not-valid-json",
                 headers={"Content-Type": "application/json"},
             )
@@ -185,7 +185,7 @@ class TestEdgeCases:
         """Test sending wrong content type."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
-                "/sessions/create",
+                "/sessions",
                 content="test",
                 headers={"Content-Type": "text/plain"},
             )
@@ -195,11 +195,11 @@ class TestEdgeCases:
         """Test that extra fields in requests are handled gracefully."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
-                "/sessions/create",
+                "/sessions",
                 json={
-                    "bundle": "foundation",
+                    "config_id": "test-config",
                     "extra_field": "should be ignored",
                     "another_extra": 12345,
                 },
             )
-            assert response.status_code in [200, 500]
+            assert response.status_code in [200, 404, 500]

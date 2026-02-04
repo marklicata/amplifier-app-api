@@ -12,9 +12,8 @@ class SessionInfo(BaseModel):
     """Session information summary."""
 
     session_id: str
+    config_id: str
     status: SessionStatus
-    bundle: str | None = None
-    provider: str | None = None
     message_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -24,8 +23,8 @@ class SessionResponse(BaseModel):
     """Response for session operations."""
 
     session_id: str
+    config_id: str
     status: SessionStatus
-    metadata: dict[str, Any] = Field(default_factory=dict)
     message: str | None = None
 
 
@@ -106,7 +105,7 @@ class HealthResponse(BaseModel):
 
     status: str
     version: str
-    uptime_seconds: float
+    uptime: str
     database_connected: bool
 
 
