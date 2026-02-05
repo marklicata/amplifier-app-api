@@ -167,8 +167,6 @@ jobs:
           inlineScript: |
             # Explicitely set subscription
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-            echo "Deploying with auto-scaling configuration..."
             
             # Update container app with new image and scaling rules
             az containerapp update \

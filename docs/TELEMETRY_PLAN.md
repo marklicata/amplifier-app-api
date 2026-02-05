@@ -1,14 +1,18 @@
-# Service Telemetry Plan for amplifier-app-api
+# Service Telemetry Architecture for amplifier-app-api
 
 **Date:** 2026-02-05  
-**Status:** Planning  
+**Status:** ✅ **FULLY IMPLEMENTED**  
 **Reference Implementation:** `amplifier-onboarding/lib/telemetry`
+
+> **✅ IMPLEMENTATION STATUS: COMPLETE**  
+> The telemetry system is fully implemented and operational. Application Insights integration is active in production.  
+> For testing and validation, see [TELEMETRY_TESTING.md](./TELEMETRY_TESTING.md).
 
 ---
 
 ## Executive Summary
 
-This document outlines the telemetry strategy for the amplifier-app-api service. Unlike the website telemetry system (which tracks user interactions and page views), service telemetry focuses on **operational health, request lifecycle, performance metrics, and business domain events**.
+This document describes the implemented telemetry architecture for the amplifier-app-api service. Unlike website telemetry (which tracks user interactions and page views), service telemetry focuses on **operational health, request lifecycle, performance metrics, and business domain events**.
 
 ---
 

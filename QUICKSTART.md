@@ -75,18 +75,40 @@ nano .env
 **Minimum required:**
 
 ```bash
-# At least one API key
+# At least one LLM provider API key
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 # OR
 OPENAI_API_KEY=sk-your-key-here
 ```
 
-**Optional (paths auto-detected from .env if using default locations):**
+**Authentication (for local development):**
+
+```bash
+# Auth disabled by default for easy local development
+AUTH_REQUIRED=false
+
+# For production, set AUTH_REQUIRED=true and configure:
+SECRET_KEY=<generate-with-openssl-rand-hex-32>
+JWT_ALGORITHM=HS256  # or RS256 for production
+```
+
+**Telemetry (optional):**
+
+```bash
+# Enable Application Insights telemetry
+TELEMETRY_ENABLED=true
+TELEMETRY_APP_INSIGHTS_CONNECTION_STRING=<from-azure-portal>
+TELEMETRY_ENVIRONMENT=development
+```
+
+**Optional paths:**
 
 ```bash
 AMPLIFIER_CORE_PATH=../amplifier-core
 AMPLIFIER_FOUNDATION_PATH=../amplifier-foundation
 ```
+
+> **Note:** Authentication is disabled by default (`AUTH_REQUIRED=false`) so you can test locally without setting up API keys. For production deployment, see [docs/TESTING_AUTHENTICATION.md](docs/TESTING_AUTHENTICATION.md).
 
 ## 4. Start the Service
 
@@ -125,7 +147,7 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "uptime_seconds": 5.2,
   "database_connected": true
 }
@@ -273,10 +295,12 @@ ls -la $(python3 -c "from amplifier_app_api.config import settings; print(settin
 
 Once the service is running:
 
-1. **Test with curl** - Use the examples above
+1. **Test with curl** - Use the examples above (no auth needed in dev mode)
 2. **Explore the API docs** - http://localhost:8765/docs
-3. **Integrate with a client** - Web app, mobile app, etc.
-4. **Customize** - Modify your local forks and see changes immediately
+3. **Set up authentication (for production)** - See [docs/TESTING_AUTHENTICATION.md](docs/TESTING_AUTHENTICATION.md)
+4. **Configure telemetry** - See [docs/TELEMETRY_TESTING.md](docs/TELEMETRY_TESTING.md)
+5. **Integrate with a client** - Web app, mobile app, etc.
+6. **Customize** - Modify your local forks and see changes immediately
 
 ## Development Workflow
 

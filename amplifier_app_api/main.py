@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from .api import (
+    applications_router,
     bundles_router,
     config_router,
     health_router,
@@ -17,6 +18,7 @@ from .api import (
     tools_router,
 )
 from .config import settings
+from .middleware.auth import AuthMiddleware
 from .storage import init_database
 from .telemetry import TelemetryMiddleware, flush_telemetry, initialize_telemetry
 
@@ -103,7 +105,7 @@ Lightweight runtime instances that reference a Config:
 - **Type Safety**: Full Pydantic validation
 - **Cache Invalidation**: Automatic when configs are updated
 """,
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -112,6 +114,9 @@ Lightweight runtime instances that reference a Config:
 
 # Telemetry middleware (first, to capture all requests)
 app.add_middleware(TelemetryMiddleware)
+
+# Authentication middleware (before CORS, to reject unauthorized requests early)
+app.add_middleware(AuthMiddleware)
 
 # CORS middleware
 app.add_middleware(
@@ -131,6 +136,7 @@ if settings.service_host != "0.0.0.0":
 
 # Register routers
 app.include_router(health_router)
+app.include_router(applications_router)
 app.include_router(sessions_router)
 app.include_router(config_router)
 app.include_router(bundles_router)

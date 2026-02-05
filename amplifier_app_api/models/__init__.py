@@ -1,5 +1,11 @@
 """Data models for the Amplifier service."""
 
+from .application import (
+    Application,
+    ApplicationCreate,
+    ApplicationInfo,
+    ApplicationResponse,
+)
 from .config import (
     Config,
     ConfigCreateRequest,
@@ -31,8 +37,14 @@ from .responses import (
     VersionResponse,
 )
 from .session import Session, SessionMetadata, SessionStatus
+from .user import User
 
 __all__ = [
+    # Application models
+    "Application",
+    "ApplicationCreate",
+    "ApplicationInfo",
+    "ApplicationResponse",
     # Config models
     "Config",
     "ConfigMetadata",
@@ -64,4 +76,6 @@ __all__ = [
     "Session",
     "SessionMetadata",
     "SessionStatus",
+    # User models
+    "User",
 ]

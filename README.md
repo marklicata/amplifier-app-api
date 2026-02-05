@@ -8,13 +8,15 @@ This service is based on [amplifier-app-cli](https://github.com/microsoft/amplif
 
 **Key Features:**
 - 🔌 RESTful API for Amplifier sessions
+- 🔐 API Key + JWT authentication (multi-tenant)
+- 📊 Application Insights telemetry
 - 📦 Bundle and provider management
 - 🛠️ Tool invocation endpoints
 - 📝 Configuration management
 - 💾 SQLite-based persistence
 - 🔄 Server-Sent Events (SSE) for streaming
 - 🐳 Docker deployment ready
-- 🧪 164+ tests with 100% endpoint coverage
+- 🧪 67+ tests with full endpoint coverage
 
 ## Quick Start
 
@@ -49,6 +51,7 @@ amplifier-app-api/
 │   │   ├── sessions.py   # Session management
 │   │   ├── config.py     # Configuration
 │   │   ├── bundles.py    # Bundle management
+│   │   ├── applications.py  # Application registration
 │   │   ├── tools.py      # Tool invocation
 │   │   ├── health.py     # Health checks
 │   │   └── smoke.py      # Smoke test endpoint
@@ -56,14 +59,24 @@ amplifier-app-api/
 │   │   ├── session_manager.py   # Wraps amplifier-core
 │   │   ├── config_manager.py    # Config management
 │   │   └── tool_manager.py      # Tool operations
+│   ├── middleware/       # Middleware
+│   │   └── auth.py       # Authentication (API key + JWT)
 │   ├── models/           # Pydantic data models
+│   │   ├── application.py  # Application models
+│   │   ├── user.py         # User models
+│   │   └── session.py      # Session models
 │   ├── storage/          # Database layer (SQLite)
+│   ├── telemetry/        # Application Insights telemetry
 │   ├── config.py         # Application settings
 │   └── main.py           # FastAPI application
-├── tests/                # 164+ test cases
+├── tests/                # 67+ test cases
+│   ├── test_applications.py  # Auth tests
+│   ├── test_auth_middleware.py
+│   └── test_auth_integration.py
+├── docs/                 # Documentation
 ├── Dockerfile
 ├── docker-compose.yml
-└── pyproject.toml        # Uses local forks
+└── pyproject.toml        # Uses pinned commits
 ```
 
 ## Prerequisites
@@ -102,6 +115,26 @@ amplifier-app-api/
 | POST | `/sessions/{id}/stream` | Stream responses (SSE) |
 | POST | `/sessions/{id}/cancel` | Cancel operation |
 
+### Application Management (5 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/applications` | Register a new application |
+| GET | `/applications` | List all applications |
+| GET | `/applications/{id}` | Get application details |
+| DELETE | `/applications/{id}` | Delete application |
+| POST | `/applications/{id}/regenerate-key` | Regenerate API key |
+
+### Bundles (5 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/bundles` | List available bundles |
+| GET | `/bundles/{name}` | Get bundle information |
+| POST | `/bundles/validate` | Validate bundle YAML |
+| POST | `/bundles/load` | Load and prepare bundle |
+| GET | `/bundles/{name}/tools` | List tools in bundle |
+
 ### Tools (3 endpoints)
 
 | Method | Endpoint | Description |
@@ -110,15 +143,17 @@ amplifier-app-api/
 | GET | `/tools/{name}` | Get tool information |
 | POST | `/tools/invoke` | Invoke a tool |
 
-### Health & Testing (3 endpoints)
+### Health & Testing (5 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Service health check |
 | GET | `/version` | Version information |
 | GET | `/` | Service information |
+| GET | `/smoke-tests/quick` | Run quick smoke tests |
+| GET | `/smoke-tests` | Run full test suite |
 
-**Total: 22 endpoints**
+**Total: 34 endpoints**
 
 ## Usage Examples
 
@@ -217,9 +252,8 @@ curl -X POST http://localhost:8765/sessions \
 Create `.env` from `.env.example` and configure:
 
 ```bash
-# Required: At least one API key
+# LLM API Keys (required: at least one)
 ANTHROPIC_API_KEY=your-key-here
-# OR
 OPENAI_API_KEY=your-key-here
 
 # Service settings
@@ -229,13 +263,52 @@ SERVICE_PORT=8765
 # Database
 DATABASE_URL=sqlite+aiosqlite:///./amplifier.db
 
-# Local fork paths (default: ../amplifier-core and ../amplifier-foundation)
+# Authentication (disabled by default for local dev)
+AUTH_REQUIRED=false                    # Set true for production
+AUTH_MODE=api_key_jwt                  # api_key_jwt | jwt_only
+SECRET_KEY=generate-new-key-here       # openssl rand -hex 32
+JWT_ALGORITHM=HS256                    # HS256 (dev) | RS256 (prod)
+JWT_PUBLIC_KEY_URL=                    # JWKS endpoint for RS256
+JWT_ISSUER=                            # Expected 'iss' claim
+JWT_AUDIENCE=                          # Expected 'aud' claim
+
+# Telemetry
+TELEMETRY_ENABLED=true
+TELEMETRY_APP_INSIGHTS_CONNECTION_STRING=  # From Azure portal
+TELEMETRY_APP_ID=amplifier-app-api
+TELEMETRY_ENVIRONMENT=development
+
+# Local fork paths
 AMPLIFIER_CORE_PATH=../amplifier-core
 AMPLIFIER_FOUNDATION_PATH=../amplifier-foundation
 
 # CORS (comma-separated)
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 ```
+
+### Authentication Setup
+
+**For local development** (default):
+- `AUTH_REQUIRED=false` - No authentication needed
+- All endpoints accessible without credentials
+
+**For production**:
+1. Set `AUTH_REQUIRED=true`
+2. Generate secret key: `openssl rand -hex 32`
+3. Register applications to get API keys:
+   ```bash
+   curl -X POST http://localhost:8765/applications \
+     -H "Content-Type: application/json" \
+     -d '{"app_id": "my-app", "app_name": "My Application"}'
+   ```
+4. Include headers in requests:
+   ```bash
+   curl http://localhost:8765/sessions \
+     -H "X-API-Key: app_xxxx" \
+     -H "Authorization: Bearer <jwt-token>"
+   ```
+
+See [docs/TESTING_AUTHENTICATION.md](docs/TESTING_AUTHENTICATION.md) for complete authentication guide.
 
 ### Using Local Forks
 
@@ -282,13 +355,16 @@ See [docs/SETUP.md](docs/SETUP.md) for production deployment guide.
 
 ## Testing
 
-The service includes a comprehensive test suite with 164+ test cases.
+The service includes a comprehensive test suite with 67+ test cases.
 
 ### Run Tests
 
 ```bash
-# Quick tests (41 tests in ~2 seconds)
+# Infrastructure tests (41 tests in ~2 seconds)
 .venv/bin/python -m pytest tests/test_database.py tests/test_models.py -v
+
+# Authentication tests (26 tests in ~15 seconds)
+.venv/bin/python -m pytest tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py -v
 
 # All tests
 .venv/bin/python -m pytest tests/ -v
@@ -300,11 +376,17 @@ The service includes a comprehensive test suite with 164+ test cases.
 # Start service
 ./run-dev.sh
 
-# Run smoke tests via HTTP
+# Run quick smoke tests (includes auth check)
 curl http://localhost:8765/smoke-tests/quick
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for complete testing guide.
+**Test Coverage:**
+- ✅ Infrastructure (database, models): 41 tests
+- ✅ Authentication (applications, middleware, integration): 26 tests
+- ✅ API endpoints: Smoke tests for all 34 endpoints
+- ✅ E2E flows: Config → Session → Message
+
+See [docs/TESTING.md](docs/TESTING.md) and [docs/TESTING_AUTHENTICATION.md](docs/TESTING_AUTHENTICATION.md) for complete guides.
 
 ## Differences from amplifier-app-cli
 
@@ -319,9 +401,18 @@ See [docs/TESTING.md](docs/TESTING.md) for complete testing guide.
 
 ## Documentation
 
+### Getting Started
 - **[QUICKSTART.md](QUICKSTART.md)** - Get running in 5 minutes
 - **[docs/SETUP.md](docs/SETUP.md)** - Production deployment guide
+
+### Features & Architecture
+- **[docs/AUTHENTICATION_DESIGN.md](docs/AUTHENTICATION_DESIGN.md)** - Authentication architecture (✅ Implemented)
+- **[docs/TELEMETRY_PLAN.md](docs/TELEMETRY_PLAN.md)** - Telemetry architecture (✅ Implemented)
+
+### Testing
 - **[docs/TESTING.md](docs/TESTING.md)** - Test suite documentation
+- **[docs/TESTING_AUTHENTICATION.md](docs/TESTING_AUTHENTICATION.md)** - Authentication testing guide
+- **[docs/TELEMETRY_TESTING.md](docs/TELEMETRY_TESTING.md)** - Telemetry testing guide
 - **[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)** - Manual testing procedures
 
 ## Troubleshooting

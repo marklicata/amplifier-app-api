@@ -4,7 +4,7 @@ Complete guide to the test suite for this service.
 
 ## 🎯 Quick Start
 
-### Run Tests (2 seconds)
+### Run Infrastructure Tests (2 seconds)
 
 ```bash
 cd /mnt/c/Users/malicata/source/amplifier-app-api
@@ -14,26 +14,38 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 **Expected:** 41 passed in ~2 seconds ✅
 
+### Run Authentication Tests (15 seconds)
+
+```bash
+.venv/bin/python -m pytest tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py -v
+```
+
+**Expected:** 26 passed in ~15 seconds ✅
+
 ---
 
 ## 📊 Test Suite Overview
 
 ### Statistics
 
-- **Total test files:** 14
-- **Total test cases:** 180+
-- **Lines of test code:** 2,500+
-- **Currently passing:** 41 tests (infrastructure)
-- **E2E tests:** 50+ tests (real HTTP server)
-- **API endpoint coverage:** 100% (22/22 endpoints)
+- **Total test files:** 21
+- **Total test cases:** 180+ (67 passing unit/auth + 121+ E2E tests)
+- **Lines of test code:** 8,000+
+- **API endpoint coverage:** 100% (34/34 endpoints)
+- **E2E coverage:** All endpoints tested with real HTTP server
+- **Test types:** Unit, Integration, E2E
 
 ### Test Types
 
 | Type | Tests | Speed | Description |
 |------|-------|-------|-------------|
-| **Unit** | 41 | ~2s | Database + Models (ASGI in-process) |
-| **E2E** | 50+ | ~60s | Real HTTP server with uvicorn |
-| **Comprehensive** | 100+ | Varies | Full API coverage (ASGI) |
+| **Infrastructure** | 41 | ~2s | Database + Models (ASGI in-process) |
+| **Authentication** | 26 | ~15s | Applications, middleware, integration |
+| **E2E - Core Features** | 56 | ~5-10min | Messages, streaming, bundles, tools |
+| **E2E - Comprehensive** | 65+ | Varies | All endpoint validation |
+| **Smoke** | 13 | ~5s | Quick health checks |
+
+**Total E2E Tests:** 121+ tests with real HTTP server
 
 ---
 
@@ -42,11 +54,32 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 ### Fast Tests (Recommended for Development)
 
 ```bash
-# Database + Models (41 tests, ~2 seconds)
+# Infrastructure: Database + Models (41 tests, ~2 seconds)
 .venv/bin/python -m pytest tests/test_database.py tests/test_models.py -v
 
-# Without warnings (cleaner output)
-.venv/bin/python -m pytest tests/test_database.py tests/test_models.py -v --disable-warnings
+# Authentication: All auth tests (26 tests, ~15 seconds)
+.venv/bin/python -m pytest tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py -v
+
+# All fast tests (67 tests, ~17 seconds)
+.venv/bin/python -m pytest tests/test_database.py tests/test_models.py tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py -v
+```
+
+### E2E Tests (Real HTTP Server)
+
+**⚠️ Important:** E2E tests start a real service on port 8767. First run takes 5-10 minutes due to bundle downloads. Subsequent runs use cache.
+
+```bash
+# Core features (56 tests) - Messages, streaming, bundles, tools
+.venv/bin/python -m pytest tests/test_session_messages_e2e.py tests/test_session_streaming_e2e.py tests/test_bundles_complete_e2e.py tests/test_tools_complete_e2e.py -v -m e2e
+
+# Individual E2E test files
+.venv/bin/python -m pytest tests/test_session_messages_e2e.py -v -m e2e  # 13 tests
+.venv/bin/python -m pytest tests/test_session_streaming_e2e.py -v -m e2e  # 7 tests
+.venv/bin/python -m pytest tests/test_bundles_complete_e2e.py -v -m e2e  # 19 tests
+.venv/bin/python -m pytest tests/test_tools_complete_e2e.py -v -m e2e     # 17 tests
+
+# All E2E tests (121+ tests)
+.venv/bin/python -m pytest -m e2e -v
 ```
 
 ### E2E Tests (Real HTTP Server)
@@ -78,29 +111,40 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 ## 📁 Test Files
 
-### Unit Tests (ASGI - Fast)
+### Infrastructure Tests (ASGI - Fast) ✅
 
-- **`test_database.py`** (17 tests) ✅ - Database layer validation
-- **`test_models.py`** (24 tests) ✅ - Pydantic model validation
+- **`test_database.py`** (17 tests) - Database layer validation
+- **`test_models.py`** (24 tests) - Pydantic model validation
 - **`test_api.py`** (10 tests) - Basic endpoint validation
 - **`test_smoke.py`** (13 tests) - Quick smoke tests
 
-### Comprehensive Tests (ASGI - Full Coverage)
+### Authentication Tests ✅
 
-- **`test_sessions_comprehensive.py`** (40 tests) - Every session endpoint scenario
-- **`test_config_comprehensive.py`** (30+ tests) - Configuration management
-- **`test_bundles_comprehensive.py`** (14 tests) - Bundle operations
-- **`test_tools_comprehensive.py`** (20+ tests) - Tool listing and invocation
-- **`test_health_comprehensive.py`** (15+ tests) - Health checks
-- **`test_integration_flows.py`** (15+ tests) - Multi-step workflows
-- **`test_stress.py`** (8 tests) - Load and concurrency testing
+- **`test_applications.py`** (12 tests) - Application registration and management
+- **`test_auth_middleware.py`** (11 tests) - Authentication middleware logic
+- **`test_auth_integration.py`** (3 tests) - End-to-end auth flows
 
-### End-to-End Tests (Real HTTP Server)
+See [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) for detailed authentication testing guide.
 
-- **`test_e2e_all_endpoints.py`** (50+ tests) - **Real uvicorn server, real HTTP requests**
-- **`test_e2e_live_service.py`** (25 tests) - Live service validation
+### End-to-End Tests (Real HTTP Server) ✅
 
-**E2E tests actually start the service and test over HTTP!**
+**Core E2E Tests:**
+- **`test_session_messages_e2e.py`** (13 tests) - **Actual AI message sending with responses**
+- **`test_session_streaming_e2e.py`** (7 tests) - **SSE streaming functionality**
+- **`test_bundles_complete_e2e.py`** (19 tests) - **Complete bundle lifecycle**
+- **`test_tools_complete_e2e.py`** (17 tests) - **Successful tool invocation**
+- **`test_e2e_all_endpoints.py`** (40+ tests) - All endpoints existence validation
+- **`test_e2e_live_service.py`** (25+ tests) - Live service validation
+
+**Total E2E Tests:** 121+ tests covering all 34 endpoints with real HTTP requests
+
+**Note:** E2E tests start a real uvicorn server on port 8767. First run is slow (bundle downloads). Subsequent runs use cache.
+
+### Integration Tests
+
+- **`test_integration_flows.py`** - Multi-step workflows
+- **`test_integration_config_session.py`** - Config → Session flows
+- **`test_stress.py`** - Load and concurrency testing
 
 ---
 
@@ -191,33 +235,38 @@ curl "http://localhost:8765/smoke-tests?verbose=true"
 
 ## 📋 Test Coverage by Endpoint
 
-### Configuration (8 endpoints, 40+ tests)
-- `POST /configs` - Create config (YAML bundle)
-- `GET /configs` - List configs with pagination
-- `GET /configs/{id}` - Get config details
-- `PUT /configs/{id}` - Update config
-- `DELETE /configs/{id}` - Delete config
-- `POST /configs/{id}/tools` - Add tool to config
-- `POST /configs/{id}/providers` - Add provider to config
-- `POST /configs/{id}/bundles` - Merge bundle into config
+### Configuration (8 endpoints)
+- ✅ Config CRUD operations (create, read, update, delete)
+- ✅ Programmatic helpers (add tool, provider, bundle)
+- ✅ YAML validation and parsing
+- ✅ Pagination and filtering
 
-### Sessions (8 endpoints, 40+ tests)
-- `POST /sessions` - Create session from config
-- `GET /sessions` - Listing and pagination
-- `GET /sessions/{id}` - Retrieval
-- `DELETE /sessions/{id}` - Deletion
-- `POST /sessions/{id}/resume` - Resumption
-- `POST /sessions/{id}/messages` - Message handling
-- `POST /sessions/{id}/stream` - SSE streaming
-- `POST /sessions/{id}/cancel` - Cancellation
+### Sessions (8 endpoints)
+- ✅ Session lifecycle (create, resume, delete)
+- ✅ Message handling and streaming
+- ✅ Config integration
+- ✅ State management
 
-### Tools (3 endpoints, 20+ tests)
-- Tool discovery and invocation
-- Security testing
+### Applications (5 endpoints) ✅
+- ✅ Application registration
+- ✅ API key generation and validation
+- ✅ API key rotation
+- ✅ Application management (list, get, delete)
 
-### Health (3 endpoints, 15+ tests)
-- Health checks, version info
-- Service status
+### Bundles (5 endpoints)
+- ✅ Bundle discovery and loading
+- ✅ Tool enumeration
+- ✅ Validation
+
+### Tools (3 endpoints)
+- ✅ Tool discovery
+- ✅ Tool invocation
+- ✅ Bundle-scoped tools
+
+### Health & Testing (5 endpoints)
+- ✅ Health checks and version info
+- ✅ Smoke test execution
+- ✅ Service status
 
 ---
 

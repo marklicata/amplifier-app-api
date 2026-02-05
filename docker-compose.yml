@@ -25,10 +25,6 @@ services:
       # CORS
       ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
 
-      # Amplifier paths (using local forks)
-      AMPLIFIER_CORE_PATH: /app/amplifier-core
-      AMPLIFIER_FOUNDATION_PATH: /app/amplifier-foundation
-
       # API Keys (pass through from host)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

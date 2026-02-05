@@ -75,6 +75,28 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_requests_per_minute: int = Field(default=60, description="Rate limit per minute")
 
+    # Authentication
+    auth_mode: str = Field(
+        default="api_key_jwt",
+        description="Authentication mode: none, api_key_jwt, jwt_only",
+    )
+    auth_required: bool = Field(
+        default=False,
+        description="Require authentication (set to True for production)",
+    )
+    api_key_header: str = Field(
+        default="X-API-Key", description="Header name for API key authentication"
+    )
+
+    # JWT settings
+    jwt_algorithm: str = Field(default="RS256", description="JWT algorithm (RS256 for production)")
+    jwt_public_key_url: str | None = Field(
+        default=None,
+        description="URL to fetch JWT public keys (JWKS endpoint)",
+    )
+    jwt_issuer: str | None = Field(default=None, description="Expected JWT issuer (iss claim)")
+    jwt_audience: str | None = Field(default=None, description="Expected JWT audience (aud claim)")
+
     def get_api_keys(self) -> dict[str, str]:
         """Get all configured API keys."""
         keys = {}

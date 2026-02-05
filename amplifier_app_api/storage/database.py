@@ -87,6 +87,12 @@ class Database:
             await self._connection.commit()
             logger.info("Database schema initialized")
 
+            # Run authentication migration
+            from .migrations import migrate_to_auth
+
+            await migrate_to_auth(self._connection)
+            logger.info("Authentication migration completed")
+
     # Session operations
     async def create_session(
         self,
