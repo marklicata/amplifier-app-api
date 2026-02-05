@@ -42,6 +42,15 @@ services:
       # Rate limiting
       RATE_LIMIT_REQUESTS_PER_MINUTE: 60
 
+      # Telemetry
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-true}
+      TELEMETRY_APP_INSIGHTS_CONNECTION_STRING: ${TELEMETRY_APP_INSIGHTS_CONNECTION_STRING:-}
+      TELEMETRY_APP_ID: amplifier-app-api
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-development}
+      TELEMETRY_SAMPLE_RATE: ${TELEMETRY_SAMPLE_RATE:-1.0}
+      TELEMETRY_SAMPLE_RATE_ERRORS: 1.0
+      TELEMETRY_ENABLE_DEV_LOGGER: ${TELEMETRY_ENABLE_DEV_LOGGER:-true}
+
     volumes:
       # Persist database and sessions
       - amplifier-data:/data
