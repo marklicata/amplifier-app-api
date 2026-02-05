@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from .api import (
+    applications_router,
     bundles_router,
     config_router,
     health_router,
@@ -118,6 +119,7 @@ if settings.service_host != "0.0.0.0":
 
 # Register routers
 app.include_router(health_router)
+app.include_router(applications_router)
 app.include_router(sessions_router)
 app.include_router(config_router)
 app.include_router(bundles_router)
