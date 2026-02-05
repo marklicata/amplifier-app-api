@@ -76,11 +76,24 @@ amplifier-app-api/
 
 ## API Endpoints
 
+### Configuration (8 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/configs` | Create a new config (YAML bundle) |
+| GET | `/configs` | List all configs |
+| GET | `/configs/{id}` | Get config details |
+| PUT | `/configs/{id}` | Update config |
+| DELETE | `/configs/{id}` | Delete a config |
+| POST | `/configs/{id}/tools` | Add tool to config |
+| POST | `/configs/{id}/providers` | Add provider to config |
+| POST | `/configs/{id}/bundles` | Merge bundle into config |
+
 ### Session Management (8 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/sessions/create` | Create a new session |
+| POST | `/sessions` | Create session from config |
 | GET | `/sessions` | List all sessions |
 | GET | `/sessions/{id}` | Get session details |
 | DELETE | `/sessions/{id}` | Delete a session |
@@ -88,28 +101,6 @@ amplifier-app-api/
 | POST | `/sessions/{id}/messages` | Send message |
 | POST | `/sessions/{id}/stream` | Stream responses (SSE) |
 | POST | `/sessions/{id}/cancel` | Cancel operation |
-
-### Configuration (7 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/config` | Get all configuration |
-| POST | `/config` | Update configuration |
-| GET | `/config/providers` | List providers |
-| POST | `/config/providers` | Add/update provider |
-| GET | `/config/providers/{name}` | Get provider config |
-| POST | `/config/providers/{name}/activate` | Set active provider |
-| GET | `/config/providers/current` | Get active provider |
-
-### Bundles (5 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/bundles` | List all bundles |
-| POST | `/bundles` | Add a bundle |
-| GET | `/bundles/{name}` | Get bundle details |
-| DELETE | `/bundles/{name}` | Remove bundle |
-| POST | `/bundles/{name}/activate` | Set active bundle |
 
 ### Tools (3 endpoints)
 
@@ -119,52 +110,72 @@ amplifier-app-api/
 | GET | `/tools/{name}` | Get tool information |
 | POST | `/tools/invoke` | Invoke a tool |
 
-### Health & Testing (5 endpoints)
+### Health & Testing (3 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Service health check |
 | GET | `/version` | Version information |
 | GET | `/` | Service information |
-| GET | `/smoke-tests/quick` | Quick smoke tests via API |
-| GET | `/smoke-tests` | Full test suite via API |
 
-**Total: 28 endpoints**
+**Total: 22 endpoints**
 
 ## Usage Examples
 
-### Create a Session
+### 1. Create a Config (YAML Bundle)
+
+First, create a config that defines your Amplifier setup:
 
 ```bash
-curl -X POST http://localhost:8765/sessions/create \
+curl -X POST http://localhost:8765/configs \
   -H "Content-Type: application/json" \
   -d '{
-    "bundle": "foundation",
-    "provider": "anthropic",
-    "model": "claude-sonnet-4-5"
+    "name": "my-dev-config",
+    "description": "Development configuration with Anthropic",
+    "yaml_content": "bundle:\n  name: dev-config\n  version: 1.0.0\n\nincludes:\n  - bundle: foundation\n\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: ${ANTHROPIC_API_KEY}\n      model: claude-sonnet-4-5\n\nsession:\n  orchestrator: loop-streaming\n  context: context-persistent"
   }'
 ```
 
 **Response:**
 ```json
 {
-  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7",
+  "name": "my-dev-config",
+  "description": "Development configuration with Anthropic",
+  "yaml_content": "bundle:\n  name: dev-config...",
+  "created_at": "2026-02-05T00:00:00Z",
+  "updated_at": "2026-02-05T00:00:00Z",
+  "tags": {},
+  "message": "Config created successfully"
+}
+```
+
+### 2. Create a Session from Config
+
+Use the config_id to create a session:
+
+```bash
+curl -X POST http://localhost:8765/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7"
+  }'
+```
+
+**Response:**
+```json
+{
+  "session_id": "s1a2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o",
+  "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7",
   "status": "active",
-  "metadata": {
-    "bundle": "foundation",
-    "provider": "anthropic",
-    "model": "claude-sonnet-4-5",
-    "created_at": "2026-02-03T17:00:00",
-    "message_count": 0
-  },
   "message": "Session created successfully"
 }
 ```
 
-### Send a Message
+### 3. Send a Message
 
 ```bash
-curl -X POST http://localhost:8765/sessions/{session_id}/messages \
+curl -X POST http://localhost:8765/sessions/s1a2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o/messages \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Create a Python function to calculate fibonacci numbers"
@@ -174,37 +185,30 @@ curl -X POST http://localhost:8765/sessions/{session_id}/messages \
 **Response:**
 ```json
 {
-  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "session_id": "s1a2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o",
   "response": "Here's a Python function...",
   "metadata": {
-    "provider": "anthropic",
-    "model": "claude-sonnet-4-5"
+    "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7"
   }
 }
 ```
 
-### Run Smoke Tests
+### 4. Reuse Config for Multiple Sessions
+
+Create another session from the same config:
 
 ```bash
-# Quick health checks
-curl http://localhost:8765/smoke-tests/quick
+curl -X POST http://localhost:8765/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7"
+  }'
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "passed": 4,
-  "failed": 0,
-  "total": 4,
-  "tests": [
-    {"name": "health_endpoint", "passed": true},
-    {"name": "database_connectivity", "passed": true},
-    {"name": "sessions_endpoint", "passed": true},
-    {"name": "config_endpoint", "passed": true}
-  ]
-}
-```
+**Benefits:**
+- Same configuration guaranteed
+- Bundle already prepared (instant session creation)
+- Parallel conversations with identical setup
 
 ## Configuration
 
@@ -274,7 +278,7 @@ docker build -t amplifier-app-api .
 docker run -p 8765:8765 --env-file .env amplifier-app-api
 ```
 
-See [SETUP.md](SETUP.md) for production deployment guide.
+See [docs/SETUP.md](docs/SETUP.md) for production deployment guide.
 
 ## Testing
 
@@ -300,7 +304,7 @@ The service includes a comprehensive test suite with 164+ test cases.
 curl http://localhost:8765/smoke-tests/quick
 ```
 
-See [TESTING.md](TESTING.md) for complete testing guide.
+See [docs/TESTING.md](docs/TESTING.md) for complete testing guide.
 
 ## Differences from amplifier-app-cli
 
@@ -316,9 +320,9 @@ See [TESTING.md](TESTING.md) for complete testing guide.
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Get running in 5 minutes
-- **[SETUP.md](SETUP.md)** - Production deployment guide
-- **[TESTING.md](TESTING.md)** - Test suite documentation
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Architecture and design
+- **[docs/SETUP.md](docs/SETUP.md)** - Production deployment guide
+- **[docs/TESTING.md](docs/TESTING.md)** - Test suite documentation
+- **[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)** - Manual testing procedures
 
 ## Troubleshooting
 
