@@ -18,6 +18,7 @@ from .api import (
 )
 from .config import settings
 from .storage import init_database
+from .telemetry import TelemetryMiddleware, flush_telemetry, initialize_telemetry
 
 # Configure logging
 logging.basicConfig(
@@ -37,6 +38,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Service version: {app.version}")
     logger.info(f"Host: {settings.service_host}:{settings.service_port}")
 
+    # Initialize telemetry
+    initialize_telemetry()
+    logger.info("Telemetry initialized")
+
     # Initialize database
     db = await init_database()
     logger.info("Database initialized")
@@ -50,6 +55,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("Shutting down Amplifier service...")
+
+    # Flush telemetry before shutdown
+    flush_telemetry()
+    logger.info("Telemetry flushed")
+
     await db.disconnect()
     logger.info("Amplifier service stopped")
 
@@ -99,6 +109,9 @@ Lightweight runtime instances that reference a Config:
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+# Telemetry middleware (first, to capture all requests)
+app.add_middleware(TelemetryMiddleware)
 
 # CORS middleware
 app.add_middleware(

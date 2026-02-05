@@ -19,6 +19,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "amplifier-core",
     "amplifier-foundation",
+    "opencensus-ext-azure>=1.1.13",
 ]
 
 [project.scripts]
