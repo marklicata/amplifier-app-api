@@ -7,6 +7,7 @@ import bcrypt
 import jwt
 from fastapi import HTTPException, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from ..config import settings
 
@@ -33,12 +34,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/docs",
         "/redoc",
         "/openapi.json",
+        "/applications",  # Need to register to get API keys!
     ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request through authentication."""
         # Skip auth for public endpoints
         if request.url.path in self.PUBLIC_PATHS:
+            return await call_next(request)
+
+        # Allow all /applications paths (need to register to get API keys!)
+        if request.url.path.startswith("/applications"):
             return await call_next(request)
 
         # Skip auth if not required (dev mode)
@@ -56,8 +62,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             elif settings.auth_mode == "jwt_only":
                 app_id, user_id = await self._verify_jwt_with_app_claim(request)
             else:
-                raise HTTPException(
-                    status_code=500, detail=f"Invalid auth mode: {settings.auth_mode}"
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": f"Invalid auth mode: {settings.auth_mode}"}
                 )
 
             # Set authenticated context
@@ -67,11 +74,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.info(f"Authenticated request: app_id={app_id}, user_id={user_id}")
             return await call_next(request)
 
-        except HTTPException:
-            raise
+        except HTTPException as e:
+            # Convert HTTPException to JSONResponse
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"detail": e.detail}
+            )
         except Exception as e:
             logger.error(f"Authentication error: {e}", exc_info=True)
-            raise HTTPException(status_code=401, detail="Authentication failed")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Authentication failed"}
+            )
 
     async def _verify_api_key(self, request: Request) -> str:
         """Verify API key and return app_id.
@@ -89,34 +103,32 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not api_key:
             raise HTTPException(status_code=401, detail=f"Missing {settings.api_key_header} header")
 
-        # Get database connection
-        # Note: In production, consider connection pooling or caching
-        from ..storage.database import Database
-
-        db_path = settings.database_url.replace("sqlite+aiosqlite:///", "")
-        db = Database(db_path)
-        await db.connect()
+        # Get database connection - use global instance for tests
+        from ..storage.database import get_db
 
         try:
-            # Look up application by API key
-            if not db._connection:
-                raise HTTPException(status_code=503, detail="Database not available")
+            db = await get_db()
+        except Exception as e:
+            logger.error(f"Failed to get database: {e}")
+            raise HTTPException(status_code=503, detail="Database not available")
 
-            cursor = await db._connection.execute(
-                "SELECT app_id, api_key_hash, is_active FROM applications"
-            )
-            applications = await cursor.fetchall()
+        # Look up application by API key
+        if not db._connection:
+            raise HTTPException(status_code=503, detail="Database not available")
 
-            for app in applications:
-                # Verify the API key against stored hash
-                if bcrypt.checkpw(api_key.encode(), app["api_key_hash"].encode()):
-                    if not app["is_active"]:
-                        raise HTTPException(status_code=401, detail="Application is disabled")
-                    return app["app_id"]
+        cursor = await db._connection.execute(
+            "SELECT app_id, api_key_hash, is_active FROM applications"
+        )
+        applications = await cursor.fetchall()
 
-            raise HTTPException(status_code=401, detail="Invalid API key")
-        finally:
-            await db.disconnect()
+        for app in applications:
+            # Verify the API key against stored hash
+            if bcrypt.checkpw(api_key.encode(), app["api_key_hash"].encode()):
+                if not app["is_active"]:
+                    raise HTTPException(status_code=401, detail="Application is disabled")
+                return app["app_id"]
+
+        raise HTTPException(status_code=401, detail="Invalid API key")
 
     async def _verify_jwt(self, request: Request) -> str:
         """Verify JWT and return user_id.

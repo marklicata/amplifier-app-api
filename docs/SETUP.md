@@ -81,7 +81,7 @@ amplifier-service
 curl http://localhost:8765/health
 
 # Should return:
-# {"status": "healthy", "version": "0.1.0", "uptime_seconds": 5.2, "database_connected": true}
+# {"status": "healthy", "version": "0.2.0", "uptime_seconds": 5.2, "database_connected": true}
 
 # Access API documentation
 open http://localhost:8765/docs
@@ -180,7 +180,83 @@ api.yourdomain.com {
 }
 ```
 
-#### 4. Configure Database Persistence
+#### 4. Configure Authentication
+
+**For production deployments, enable authentication:**
+
+```bash
+# In .env
+AUTH_REQUIRED=true
+AUTH_MODE=api_key_jwt
+
+# Generate secure secret key
+SECRET_KEY=$(openssl rand -hex 32)
+
+# JWT Configuration
+JWT_ALGORITHM=RS256  # Use RS256 for production
+JWT_PUBLIC_KEY_URL=https://your-auth-provider/.well-known/jwks.json
+JWT_ISSUER=https://your-auth-provider
+JWT_AUDIENCE=amplifier-api
+```
+
+**Register applications:**
+
+```bash
+# Register each client application
+curl -X POST https://api.yourdomain.com/applications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "app_id": "production-web-app",
+    "app_name": "Production Web Application"
+  }'
+
+# Save the returned API key securely!
+```
+
+**Client authentication:**
+
+All requests must include both headers:
+- `X-API-Key: app_xxxxx` (application credential)
+- `Authorization: Bearer <jwt>` (user credential)
+
+See [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) for complete authentication setup guide.
+
+#### 5. Configure Telemetry
+
+**Set up Application Insights for monitoring:**
+
+```bash
+# In .env
+TELEMETRY_ENABLED=true
+TELEMETRY_APP_INSIGHTS_CONNECTION_STRING=InstrumentationKey=xxx;IngestionEndpoint=https://xxx
+TELEMETRY_APP_ID=amplifier-app-api
+TELEMETRY_ENVIRONMENT=production
+TELEMETRY_SANITIZE_PII=true
+```
+
+**Create Application Insights resource in Azure:**
+
+```bash
+# Create resource group
+az group create --name rg-amplifier --location eastus
+
+# Create Application Insights
+az monitor app-insights component create \
+  --app amplifier-app-api \
+  --location eastus \
+  --resource-group rg-amplifier \
+  --application-type web
+
+# Get connection string
+az monitor app-insights component show \
+  --app amplifier-app-api \
+  --resource-group rg-amplifier \
+  --query connectionString -o tsv
+```
+
+See [TELEMETRY_TESTING.md](./TELEMETRY_TESTING.md) for telemetry validation.
+
+#### 6. Configure Database Persistence
 
 ```yaml
 # In docker-compose.yml
@@ -193,7 +269,7 @@ volumes:
       device: /data/amplifier
 ```
 
-#### 5. Set Up Logging
+#### 7. Set Up Logging
 
 ```bash
 # In .env
@@ -386,13 +462,16 @@ docker-compose restart
 
 ## Next Steps
 
+After deployment:
+
 - [ ] Set up CI/CD pipeline
-- [ ] Configure monitoring and alerting
-- [ ] Implement rate limiting
-- [ ] Add authentication (JWT, OAuth)
+- [ ] Configure Application Insights dashboards and alerts
+- [ ] Implement API key rotation policy
+- [ ] Document authentication flow for client developers
 - [ ] Set up multi-instance deployment with load balancer
-- [ ] Configure auto-scaling
-- [ ] Implement caching layer (Redis)
+- [ ] Configure auto-scaling based on telemetry metrics
+- [ ] Implement caching layer (Redis) if needed
+- [ ] Set up rate limiting per application
 
 ## Support
 

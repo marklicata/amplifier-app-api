@@ -1,6 +1,6 @@
 [project]
 name = "amplifier-app-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "REST API service for Amplifier AI development platform"
 license = "MIT"
 readme = "README.md"
@@ -56,6 +56,9 @@ amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundatio
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 asyncio_mode = "strict"
+markers = [
+    "e2e: End-to-end tests with real HTTP server (slow)",
+]
 
 [tool.ruff]
 line-length = 100

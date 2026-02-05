@@ -58,14 +58,14 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 
 **Verify:**
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8765/health
 ```
 
 Should return:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "database_connected": true,
   "uptime_seconds": 1.23
 }
@@ -78,7 +78,7 @@ Should return:
 ### 2.1 Create a Minimal Config
 
 ```bash
-curl -X POST http://localhost:8000/configs \
+curl -X POST http://localhost:8765/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "test-minimal",
@@ -164,7 +164,7 @@ You are a helpful test assistant with access to filesystem, bash, and web tools.
 Then create via API:
 
 ```bash
-curl -X POST http://localhost:8000/configs \
+curl -X POST http://localhost:8765/configs \
   -H "Content-Type: application/json" \
   -d @- <<EOF
 {
@@ -187,7 +187,7 @@ EOF
 
 ### 3.1 Get Specific Config
 ```bash
-curl http://localhost:8000/configs/{config_id}
+curl http://localhost:8765/configs/{config_id}
 ```
 
 Replace `{config_id}` with the ID from step 2.1.
@@ -198,7 +198,7 @@ Replace `{config_id}` with the ID from step 2.1.
 
 ### 3.2 List All Configs
 ```bash
-curl http://localhost:8000/configs?limit=10&offset=0
+curl http://localhost:8765/configs?limit=10&offset=0
 ```
 
 **Expected Response:**
@@ -237,7 +237,7 @@ curl http://localhost:8000/configs?limit=10&offset=0
 
 ### 4.1 Update Config Name
 ```bash
-curl -X PUT http://localhost:8000/configs/{config_id} \
+curl -X PUT http://localhost:8765/configs/{config_id} \
   -H "Content-Type: application/json" \
   -d '{
     "name": "test-minimal-updated"
@@ -250,7 +250,7 @@ curl -X PUT http://localhost:8000/configs/{config_id} \
 
 ### 4.2 Update YAML Content
 ```bash
-curl -X PUT http://localhost:8000/configs/{config_id} \
+curl -X PUT http://localhost:8765/configs/{config_id} \
   -H "Content-Type: application/json" \
   -d '{
     "yaml_content": "bundle:\n  name: test-minimal\n  version: 1.0.1\n\nincludes:\n  - bundle: foundation\n\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: sk-test-key\n      model: claude-sonnet-4-5\n\nsession:\n  orchestrator: loop-streaming\n  context: context-simple"
@@ -263,7 +263,7 @@ curl -X PUT http://localhost:8000/configs/{config_id} \
 
 ### 4.3 Test Invalid YAML Rejection
 ```bash
-curl -X PUT http://localhost:8000/configs/{config_id} \
+curl -X PUT http://localhost:8765/configs/{config_id} \
   -H "Content-Type: application/json" \
   -d '{
     "yaml_content": "bundle\n  name test"
@@ -278,7 +278,7 @@ curl -X PUT http://localhost:8000/configs/{config_id} \
 
 ### 5.1 Add a Tool to Config
 ```bash
-curl -X POST "http://localhost:8000/configs/{config_id}/tools?tool_module=tool-search&tool_source=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2Famplifier-module-tool-search%40main" \
+curl -X POST "http://localhost:8765/configs/{config_id}/tools?tool_module=tool-search&tool_source=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2Famplifier-module-tool-search%40main" \
   -H "Content-Type: application/json" \
   -d '{
     "timeout_seconds": 30,
@@ -291,7 +291,7 @@ curl -X POST "http://localhost:8000/configs/{config_id}/tools?tool_module=tool-s
 **Verify:**
 ```bash
 # Get the config and check YAML
-curl http://localhost:8000/configs/{config_id} | jq -r '.yaml_content'
+curl http://localhost:8765/configs/{config_id} | jq -r '.yaml_content'
 ```
 
 Should show `tool-search` in the tools array.
@@ -300,7 +300,7 @@ Should show `tool-search` in the tools array.
 
 ### 5.2 Add a Provider to Config
 ```bash
-curl -X POST "http://localhost:8000/configs/{config_id}/providers?provider_module=provider-openai" \
+curl -X POST "http://localhost:8765/configs/{config_id}/providers?provider_module=provider-openai" \
   -H "Content-Type: application/json" \
   -d '{
     "api_key": "${OPENAI_API_KEY}",
@@ -312,7 +312,7 @@ curl -X POST "http://localhost:8000/configs/{config_id}/providers?provider_modul
 
 **Verify:**
 ```bash
-curl http://localhost:8000/configs/{config_id} | jq -r '.yaml_content'
+curl http://localhost:8765/configs/{config_id} | jq -r '.yaml_content'
 ```
 
 Should show both provider-anthropic and provider-openai.
@@ -321,7 +321,7 @@ Should show both provider-anthropic and provider-openai.
 
 ### 5.3 Merge a Bundle into Config
 ```bash
-curl -X POST "http://localhost:8000/configs/{config_id}/bundles?bundle_uri=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2Famplifier-bundle-recipes%40main" \
+curl -X POST "http://localhost:8765/configs/{config_id}/bundles?bundle_uri=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2Famplifier-bundle-recipes%40main" \
   -H "Content-Type: application/json"
 ```
 
@@ -329,7 +329,7 @@ curl -X POST "http://localhost:8000/configs/{config_id}/bundles?bundle_uri=git%2
 
 **Verify:**
 ```bash
-curl http://localhost:8000/configs/{config_id} | jq -r '.yaml_content'
+curl http://localhost:8765/configs/{config_id} | jq -r '.yaml_content'
 ```
 
 Should show both foundation and recipes in includes array.
@@ -343,7 +343,7 @@ Should show both foundation and recipes in includes array.
 ### 6.1 Create Session from Config
 
 ```bash
-curl -X POST http://localhost:8000/sessions \
+curl -X POST http://localhost:8765/sessions \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "{config_id}"
@@ -385,7 +385,7 @@ INFO: Created session: {session_id} from config: {config_id}
 ### 6.2 Verify Session was Created
 
 ```bash
-curl http://localhost:8000/sessions/{session_id}
+curl http://localhost:8765/sessions/{session_id}
 ```
 
 **Expected:**
@@ -402,7 +402,7 @@ curl http://localhost:8000/sessions/{session_id}
 ### 6.3 List Sessions
 
 ```bash
-curl http://localhost:8000/sessions?limit=10&offset=0
+curl http://localhost:8765/sessions?limit=10&offset=0
 ```
 
 **Expected:**
@@ -428,7 +428,7 @@ curl http://localhost:8000/sessions?limit=10&offset=0
 
 ### 7.1 Send a Message
 ```bash
-curl -X POST http://localhost:8000/sessions/{session_id}/messages \
+curl -X POST http://localhost:8765/sessions/{session_id}/messages \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Hello! What is 2 + 2?"
@@ -456,7 +456,7 @@ curl -X POST http://localhost:8000/sessions/{session_id}/messages \
 
 ### 7.2 Verify Message Count Updated
 ```bash
-curl http://localhost:8000/sessions/{session_id}
+curl http://localhost:8765/sessions/{session_id}
 ```
 
 **Expected:**
@@ -475,7 +475,7 @@ curl http://localhost:8000/sessions/{session_id}
 
 ### 8.1 Create Second Session from Same Config
 ```bash
-curl -X POST http://localhost:8000/sessions \
+curl -X POST http://localhost:8765/sessions \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "{same_config_id}"
@@ -498,7 +498,7 @@ This proves bundle caching works!
 
 ### 8.2 Verify Both Sessions Exist
 ```bash
-curl http://localhost:8000/sessions
+curl http://localhost:8765/sessions
 ```
 
 **Expected:** Two sessions with same config_id, different session_ids
@@ -510,12 +510,12 @@ curl http://localhost:8000/sessions
 ### 9.1 Get a Session ID
 ```bash
 # List sessions and pick one
-curl http://localhost:8000/sessions | jq '.sessions[0].session_id'
+curl http://localhost:8765/sessions | jq '.sessions[0].session_id'
 ```
 
 ### 9.2 Resume the Session
 ```bash
-curl -X POST http://localhost:8000/sessions/{session_id}/resume
+curl -X POST http://localhost:8765/sessions/{session_id}/resume
 ```
 
 **Expected:**
@@ -538,7 +538,7 @@ curl -X POST http://localhost:8000/sessions/{session_id}/resume
 ## Step 10: Test Session Deletion
 
 ```bash
-curl -X DELETE http://localhost:8000/sessions/{session_id}
+curl -X DELETE http://localhost:8765/sessions/{session_id}
 ```
 
 **Expected:**
@@ -550,7 +550,7 @@ curl -X DELETE http://localhost:8000/sessions/{session_id}
 
 **Verify Deletion:**
 ```bash
-curl http://localhost:8000/sessions/{session_id}
+curl http://localhost:8765/sessions/{session_id}
 ```
 
 **Expected:** HTTP 404 - Session not found
@@ -562,7 +562,7 @@ curl http://localhost:8000/sessions/{session_id}
 ### 11.1 Create Sessions are Not Affected (Yet)
 ```bash
 # Try to delete a config that has active sessions
-curl -X DELETE http://localhost:8000/configs/{config_id}
+curl -X DELETE http://localhost:8765/configs/{config_id}
 ```
 
 **Expected:** 
@@ -573,7 +573,7 @@ curl -X DELETE http://localhost:8000/configs/{config_id}
 
 ### 11.2 Delete Config
 ```bash
-curl -X DELETE http://localhost:8000/configs/{config_id}
+curl -X DELETE http://localhost:8765/configs/{config_id}
 ```
 
 **Expected:**
@@ -585,7 +585,7 @@ curl -X DELETE http://localhost:8000/configs/{config_id}
 
 **Verify:**
 ```bash
-curl http://localhost:8000/configs/{config_id}
+curl http://localhost:8765/configs/{config_id}
 ```
 
 **Expected:** HTTP 404 - Config not found
@@ -596,7 +596,7 @@ curl http://localhost:8000/configs/{config_id}
 
 ### 12.1 Create Session with Non-existent Config
 ```bash
-curl -X POST http://localhost:8000/sessions \
+curl -X POST http://localhost:8765/sessions \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "non-existent-config-id"
@@ -609,7 +609,7 @@ curl -X POST http://localhost:8000/sessions \
 
 ### 12.2 Send Message to Non-existent Session
 ```bash
-curl -X POST http://localhost:8000/sessions/fake-session-id/messages \
+curl -X POST http://localhost:8765/sessions/fake-session-id/messages \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Hello"
@@ -622,7 +622,7 @@ curl -X POST http://localhost:8000/sessions/fake-session-id/messages \
 
 ### 12.3 Update Non-existent Config
 ```bash
-curl -X PUT http://localhost:8000/configs/fake-config-id \
+curl -X PUT http://localhost:8765/configs/fake-config-id \
   -H "Content-Type: application/json" \
   -d '{
     "name": "new-name"
@@ -638,7 +638,7 @@ curl -X PUT http://localhost:8000/configs/fake-config-id \
 ### 13.1 Create Multiple Configs
 ```bash
 for i in {1..5}; do
-  curl -X POST http://localhost:8000/configs \
+  curl -X POST http://localhost:8765/configs \
     -H "Content-Type: application/json" \
     -d "{
       \"name\": \"test-config-$i\",
@@ -650,13 +650,13 @@ done
 ### 13.2 Test Pagination
 ```bash
 # First page
-curl "http://localhost:8000/configs?limit=2&offset=0"
+curl "http://localhost:8765/configs?limit=2&offset=0"
 
 # Second page
-curl "http://localhost:8000/configs?limit=2&offset=2"
+curl "http://localhost:8765/configs?limit=2&offset=2"
 
 # Third page
-curl "http://localhost:8000/configs?limit=2&offset=4"
+curl "http://localhost:8765/configs?limit=2&offset=4"
 ```
 
 **Verify:**
@@ -672,7 +672,7 @@ This is the **end-to-end test** of the entire architecture.
 
 ### 14.1 Create Config
 ```bash
-CONFIG_RESPONSE=$(curl -X POST http://localhost:8000/configs \
+CONFIG_RESPONSE=$(curl -X POST http://localhost:8765/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "e2e-test",
@@ -685,7 +685,7 @@ echo "Created config: $CONFIG_ID"
 
 ### 14.2 Create Session from Config
 ```bash
-SESSION_RESPONSE=$(curl -X POST http://localhost:8000/sessions \
+SESSION_RESPONSE=$(curl -X POST http://localhost:8765/sessions \
   -H "Content-Type: application/json" \
   -d "{
     \"config_id\": \"$CONFIG_ID\"
@@ -697,7 +697,7 @@ echo "Created session: $SESSION_ID"
 
 ### 14.3 Send Message
 ```bash
-curl -X POST http://localhost:8000/sessions/$SESSION_ID/messages \
+curl -X POST http://localhost:8765/sessions/$SESSION_ID/messages \
   -H "Content-Type: application/json" \
   -d '{
     "message": "What is the capital of France?"
@@ -708,7 +708,7 @@ curl -X POST http://localhost:8000/sessions/$SESSION_ID/messages \
 
 ### 14.4 Create Second Session (Test Caching)
 ```bash
-SESSION_2_RESPONSE=$(curl -X POST http://localhost:8000/sessions \
+SESSION_2_RESPONSE=$(curl -X POST http://localhost:8765/sessions \
   -H "Content-Type: application/json" \
   -d "{
     \"config_id\": \"$CONFIG_ID\"
@@ -722,17 +722,17 @@ echo "Created second session: $SESSION_2_ID"
 
 ### 14.5 Verify Both Sessions Use Same Config
 ```bash
-curl http://localhost:8000/sessions/$SESSION_ID | jq '{session_id, config_id}'
-curl http://localhost:8000/sessions/$SESSION_2_ID | jq '{session_id, config_id}'
+curl http://localhost:8765/sessions/$SESSION_ID | jq '{session_id, config_id}'
+curl http://localhost:8765/sessions/$SESSION_2_ID | jq '{session_id, config_id}'
 ```
 
 **Expected:** Same config_id, different session_ids
 
 ### 14.6 Cleanup
 ```bash
-curl -X DELETE http://localhost:8000/sessions/$SESSION_ID
-curl -X DELETE http://localhost:8000/sessions/$SESSION_2_ID
-curl -X DELETE http://localhost:8000/configs/$CONFIG_ID
+curl -X DELETE http://localhost:8765/sessions/$SESSION_ID
+curl -X DELETE http://localhost:8765/sessions/$SESSION_2_ID
+curl -X DELETE http://localhost:8765/configs/$CONFIG_ID
 ```
 
 ---
@@ -803,7 +803,7 @@ vim .env
 **Fix:**
 ```bash
 # List all configs to get valid IDs
-curl http://localhost:8000/configs | jq '.configs[].config_id'
+curl http://localhost:8765/configs | jq '.configs[].config_id'
 ```
 
 ---
@@ -827,7 +827,7 @@ Create `quick_test.sh`:
 #!/bin/bash
 set -e
 
-API="http://localhost:8000"
+API="http://localhost:8765"
 
 echo "1. Creating config..."
 CONFIG=$(curl -s -X POST $API/configs \

@@ -1,5 +1,11 @@
 # Authentication & Authorization Design
 
+> **✅ IMPLEMENTATION STATUS: COMPLETE**  
+> This design has been fully implemented and deployed. Authentication is currently **in production** with `AUTH_REQUIRED=true`.  
+> For testing and usage guide, see [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md).
+
+---
+
 ## Overview
 
 This service supports multi-tenant authentication where:
