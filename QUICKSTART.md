@@ -142,43 +142,71 @@ You should see interactive Swagger UI with all endpoints.
 
 ## 6. Test the API
 
-### Create a Session
+### Step 1: Create a Config
+
+First, create a config (YAML bundle) that defines your Amplifier setup:
 
 ```bash
-curl -X POST http://localhost:8765/sessions/create \
+curl -X POST http://localhost:8765/configs \
   -H "Content-Type: application/json" \
   -d '{
-    "bundle": "foundation",
-    "provider": "anthropic"
+    "name": "quickstart-config",
+    "description": "Quick start configuration",
+    "yaml_content": "bundle:\n  name: quickstart\n  version: 1.0.0\n\nincludes:\n  - bundle: foundation\n\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: ${ANTHROPIC_API_KEY}\n      model: claude-sonnet-4-5\n\nsession:\n  orchestrator: loop-basic\n  context: context-simple"
   }'
 ```
 
 Example response:
 ```json
 {
-  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7",
+  "name": "quickstart-config",
+  "message": "Config created successfully"
+}
+```
+
+**Save the config_id!** You'll need it for the next step.
+
+### Step 2: Create a Session from the Config
+
+```bash
+# Use the config_id from above
+CONFIG_ID="c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7"
+
+curl -X POST http://localhost:8765/sessions \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"config_id\": \"${CONFIG_ID}\"
+  }"
+```
+
+Example response:
+```json
+{
+  "session_id": "s1a2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o",
+  "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7",
   "status": "active",
-  "metadata": {
-    "bundle": "foundation",
-    "provider": "anthropic",
-    "created_at": "2026-02-03T17:00:00",
-    "message_count": 0
-  },
   "message": "Session created successfully"
 }
 ```
 
-### Send a Message
+### Step 3: Send a Message
 
 ```bash
 # Use the session_id from above
-SESSION_ID="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+SESSION_ID="s1a2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o"
 
 curl -X POST "http://localhost:8765/sessions/${SESSION_ID}/messages" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Create a Python function to calculate fibonacci numbers"
   }'
+```
+
+### List Your Configs
+
+```bash
+curl http://localhost:8765/configs
 ```
 
 ### List Your Sessions
@@ -191,12 +219,6 @@ curl http://localhost:8765/sessions
 
 ```bash
 curl http://localhost:8765/tools
-```
-
-### Get Configuration
-
-```bash
-curl http://localhost:8765/config
 ```
 
 ## Troubleshooting
@@ -274,13 +296,13 @@ curl -X POST http://localhost:8765/sessions/{id}/messages \
 
 ## Production Deployment
 
-See [SETUP.md](SETUP.md) for production deployment with Docker.
+See [docs/SETUP.md](docs/SETUP.md) for production deployment with Docker.
 
 ## Getting Help
 
 - Check logs in terminal where service is running
 - Review [README.md](README.md) for full API reference
-- Check [SETUP.md](SETUP.md) for deployment guide
+- Check [docs/SETUP.md](docs/SETUP.md) for deployment guide
 - Look at API docs: http://localhost:8765/docs
 
 ---
