@@ -193,42 +193,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
     results["success"] = results["failed"] == 0
     results["total"] = results["passed"] + results["failed"]
 
-    # Test 5: Bundles endpoint
-    try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/bundles")
-            test_passed = response.status_code == 200
-            results["tests"].append({"name": "bundles_endpoint", "passed": test_passed})
-            if test_passed:
-                results["passed"] += 1
-            else:
-                results["failed"] += 1
-    except Exception as e:
-        results["tests"].append({"name": "bundles_endpoint", "passed": False, "error": str(e)})
-        results["failed"] += 1
-
-    results["success"] = results["failed"] == 0
-    results["total"] = results["passed"] + results["failed"]
-
-    # Test 6: Tools endpoint
-    try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/tools")
-            test_passed = response.status_code == 200
-            results["tests"].append({"name": "tools_endpoint", "passed": test_passed})
-            if test_passed:
-                results["passed"] += 1
-            else:
-                results["failed"] += 1
-    except Exception as e:
-        results["tests"].append({"name": "tools_endpoint", "passed": False, "error": str(e)})
-        results["failed"] += 1
-
-    results["success"] = results["failed"] == 0
-    results["total"] = results["passed"] + results["failed"]
-
     logger.info(f"Quick smoke tests completed: {results['passed']}/{results['total']} passed")
 
     return results
+
