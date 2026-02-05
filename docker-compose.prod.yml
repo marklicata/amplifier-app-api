@@ -5,12 +5,14 @@ services:
   amplifier-service:
     environment:
       # Override dev settings for production
-      LOG_LEVEL: warning
+      LOG_LEVEL: info
       
       # Telemetry - Production settings
       TELEMETRY_ENVIRONMENT: production
       TELEMETRY_SAMPLE_RATE: 1.0
       TELEMETRY_ENABLE_DEV_LOGGER: false
+      TELEMETRY_APP_INSIGHTS_CONNECTION_STRING: InstrumentationKey=48206f3f-4628-4533-bac0-e37fe3753d26;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=fff618d3-3995-4fba-8598-e876efe15767
+
       
       # Security - MUST override these
       SECRET_KEY: ${SECRET_KEY}  # Required: Generate with openssl rand -hex 32
