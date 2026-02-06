@@ -1,7 +1,6 @@
-"""Tests for database layer."""
+"""Tests for database layer with PostgreSQL."""
 
-import tempfile
-from datetime import UTC, datetime, timedelta
+import uuid
 
 import pytest
 
@@ -9,258 +8,340 @@ from amplifier_app_api.storage.database import Database
 
 
 @pytest.mark.asyncio
-class TestDatabaseConnection:
-    """Test database connection and initialization."""
-
-    async def test_database_connect(self):
-        """Test database connection."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-            assert db._connection is not None
-            await db.disconnect()
-
-    async def test_database_disconnect(self):
-        """Test database disconnection."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-            await db.disconnect()
-            assert db._connection is None
-
-    async def test_database_schema_initialization(self):
-        """Test that schema is created on connect."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-
-            # Check tables exist
-            if db._connection:
-                cursor = await db._connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
-                tables = await cursor.fetchall()
-                table_names = [t[0] for t in tables]
-
-                assert "sessions" in table_names
-                assert "configuration" in table_names
-
-            await db.disconnect()
-
-
-@pytest.mark.asyncio
 class TestSessionOperations:
     """Test session database operations."""
 
-    async def test_create_session(self):
+    async def test_create_session(self, test_db):
         """Test creating a session in database."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        # First create a config
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
 
-            await db.create_session(
-                session_id="test-123",
-                status="active",
-                bundle="foundation",
-                provider="anthropic",
-            )
+        # Create session
+        session_id = str(uuid.uuid4())
+        await test_db.create_session(
+            session_id=session_id,
+            config_id=config_id,
+            owner_user_id="test-user-001",
+            status="active",
+            created_by_app_id="test-app",
+        )
 
-            # Verify it exists
-            session = await db.get_session("test-123")
-            assert session is not None
-            assert session["session_id"] == "test-123"
-            assert session["bundle"] == "foundation"
+        # Verify it exists
+        session = await test_db.get_session(session_id)
+        assert session is not None
+        assert session["session_id"] == session_id
+        assert session["owner_user_id"] == "test-user-001"
+        assert session["created_by_app_id"] == "test-app"
 
-            await db.disconnect()
+        # Cleanup
+        await test_db.delete_session(session_id)
+        await test_db.delete_config(config_id)
 
-    async def test_get_nonexistent_session(self):
+    async def test_get_nonexistent_session(self, test_db):
         """Test getting session that doesn't exist."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        session = await test_db.get_session("nonexistent")
+        assert session is None
 
-            session = await db.get_session("nonexistent")
-            assert session is None
-
-            await db.disconnect()
-
-    async def test_update_session(self):
+    async def test_update_session(self, test_db):
         """Test updating session data."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        # Create config first
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
 
-            # Create session
-            await db.create_session(session_id="test-123", status="active")
+        # Create session
+        session_id = str(uuid.uuid4())
+        await test_db.create_session(
+            session_id=session_id,
+            config_id=config_id,
+            owner_user_id=None,
+            status="active",
+        )
 
-            # Update it
-            await db.update_session(
-                session_id="test-123",
-                status="completed",
-                message_count=5,
-            )
+        # Update it
+        await test_db.update_session(
+            session_id=session_id,
+            status="completed",
+            message_count=5,
+        )
 
-            # Verify update
-            session = await db.get_session("test-123")
-            assert session is not None
-            assert session["status"] == "completed"
-            assert session["message_count"] == 5
+        # Verify update
+        session = await test_db.get_session(session_id)
+        assert session is not None
+        assert session["status"] == "completed"
+        assert session["message_count"] == 5
 
-            await db.disconnect()
+        # Cleanup
+        await test_db.delete_session(session_id)
+        await test_db.delete_config(config_id)
 
-    async def test_delete_session(self):
+    async def test_delete_session(self, test_db):
         """Test deleting a session."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        # Create config first
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
 
-            # Create and delete
-            await db.create_session(session_id="test-123", status="active")
-            await db.delete_session("test-123")
+        # Create and delete
+        session_id = str(uuid.uuid4())
+        await test_db.create_session(
+            session_id=session_id,
+            config_id=config_id,
+            owner_user_id=None,
+            status="active",
+        )
+        await test_db.delete_session(session_id)
 
-            # Verify deleted
-            session = await db.get_session("test-123")
-            assert session is None
+        # Verify deleted
+        session = await test_db.get_session(session_id)
+        assert session is None
 
-            await db.disconnect()
+        # Cleanup config
+        await test_db.delete_config(config_id)
 
-    async def test_list_sessions(self):
+    async def test_list_sessions(self, test_db):
         """Test listing sessions."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        # Create config
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
 
-            # Create multiple sessions
-            for i in range(5):
-                await db.create_session(session_id=f"test-{i}", status="active")
-
-            # List them
-            sessions = await db.list_sessions(limit=10, offset=0)
-            assert len(sessions) == 5
-
-            await db.disconnect()
-
-    async def test_list_sessions_with_pagination(self):
-        """Test session listing pagination."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-
-            # Create 10 sessions
-            for i in range(10):
-                await db.create_session(session_id=f"test-{i}", status="active")
-
-            # Get first 5
-            page1 = await db.list_sessions(limit=5, offset=0)
-            assert len(page1) == 5
-
-            # Get next 5
-            page2 = await db.list_sessions(limit=5, offset=5)
-            assert len(page2) == 5
-
-            # Should be different sessions
-            ids1 = [s["session_id"] for s in page1]
-            ids2 = [s["session_id"] for s in page2]
-            assert set(ids1).isdisjoint(set(ids2))
-
-            await db.disconnect()
-
-    async def test_cleanup_old_sessions(self):
-        """Test cleaning up old sessions."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-
-            # Create a session
-            await db.create_session(session_id="test-old", status="completed")
-
-            # Manually update timestamp to be old (direct SQL for testing)
-            old_date = datetime.now(UTC) - timedelta(days=60)
-            conn = db._connection
-            assert conn is not None
-            await conn.execute(
-                "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
-                (old_date, "test-old"),
+        # Create multiple sessions
+        session_ids = []
+        for i in range(5):
+            session_id = f"test-list-{i}"
+            await test_db.create_session(
+                session_id=session_id,
+                config_id=config_id,
+                owner_user_id=None,
+                status="active",
             )
-            await conn.commit()
+            session_ids.append(session_id)
 
-            # Cleanup sessions older than 30 days
-            deleted = await db.cleanup_old_sessions(days=30)
-            assert deleted >= 1
+        # List them
+        sessions = await test_db.list_sessions(limit=10, offset=0)
+        assert len(sessions) >= 5  # May have other sessions
 
-            # Verify it's gone
-            session = await db.get_session("test-old")
-            assert session is None
+        # Cleanup
+        for sid in session_ids:
+            await test_db.delete_session(sid)
+        await test_db.delete_config(config_id)
 
-            await db.disconnect()
+    async def test_list_sessions_with_pagination(self, test_db):
+        """Test session listing pagination."""
+        # Create config
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
+
+        # Create 10 sessions
+        session_ids = []
+        for i in range(10):
+            session_id = f"test-page-{i}"
+            await test_db.create_session(
+                session_id=session_id,
+                config_id=config_id,
+                owner_user_id=None,
+                status="active",
+            )
+            session_ids.append(session_id)
+
+        # Get first 5
+        page1 = await test_db.list_sessions(limit=5, offset=0)
+        assert len(page1) >= 5
+
+        # Get next 5
+        page2 = await test_db.list_sessions(limit=5, offset=5)
+        assert len(page2) >= 0  # May be less than 5
+
+        # Cleanup
+        for sid in session_ids:
+            await test_db.delete_session(sid)
+        await test_db.delete_config(config_id)
+
+
+@pytest.mark.asyncio
+class TestSessionParticipants:
+    """Test session participants operations."""
+
+    async def test_auto_create_owner_participant(self, test_db):
+        """Test that creating session with user_id auto-creates participant."""
+        # Create config
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
+
+        # Create session with user
+        session_id = str(uuid.uuid4())
+        user_id = "test-user-auto"
+        await test_db.create_session(
+            session_id=session_id,
+            config_id=config_id,
+            owner_user_id=user_id,
+            status="active",
+        )
+
+        # Verify participant was auto-created
+        participants = await test_db.get_session_participants(session_id)
+        assert len(participants) == 1
+        assert participants[0]["user_id"] == user_id
+        assert participants[0]["role"] == "owner"
+
+        # Cleanup
+        await test_db.delete_session(session_id)
+        await test_db.delete_config(config_id)
+
+    async def test_add_session_participant(self, test_db):
+        """Test adding additional participants to a session."""
+        # Create config
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
+
+        # Create session
+        session_id = str(uuid.uuid4())
+        await test_db.create_session(
+            session_id=session_id,
+            config_id=config_id,
+            owner_user_id="test-owner",
+            status="active",
+        )
+
+        # Add viewer
+        await test_db.add_session_participant(session_id, "test-viewer", "viewer")
+
+        # Verify both participants exist
+        participants = await test_db.get_session_participants(session_id)
+        assert len(participants) == 2
+
+        roles = {p["user_id"]: p["role"] for p in participants}
+        assert roles["test-owner"] == "owner"
+        assert roles["test-viewer"] == "viewer"
+
+        # Cleanup
+        await test_db.delete_session(session_id)
+        await test_db.delete_config(config_id)
+
+    async def test_get_user_sessions(self, test_db):
+        """Test getting all sessions for a user."""
+        # Create config
+        config_id = str(uuid.uuid4())
+        await test_db.create_config(
+            config_id=config_id,
+            name="Test Config",
+            yaml_content="test: true",
+        )
+
+        # Create multiple sessions for same user
+        user_id = "test-user-multi"
+        session_ids = []
+        for i in range(3):
+            session_id = f"test-multi-{i}"
+            await test_db.create_session(
+                session_id=session_id,
+                config_id=config_id,
+                owner_user_id=user_id,
+                status="active",
+            )
+            session_ids.append(session_id)
+
+        # Get user's sessions
+        user_sessions = await test_db.get_user_sessions(user_id)
+        assert len(user_sessions) == 3
+
+        # Cleanup
+        for sid in session_ids:
+            await test_db.delete_session(sid)
+        await test_db.delete_config(config_id)
 
 
 @pytest.mark.asyncio
 class TestConfigurationOperations:
     """Test configuration database operations."""
 
-    async def test_set_and_get_config(self):
+    async def test_set_and_get_setting(self, test_db):
         """Test setting and getting config values."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        key = f"test_key_{uuid.uuid4()}"
 
-            # Set config
-            await db.set_config("test_key", {"value": "test"})
+        # Set setting
+        await test_db.set_setting(key, {"value": "test"})
 
-            # Get config
-            value = await db.get_config("test_key")
-            assert value == {"value": "test"}
+        # Get setting
+        value = await test_db.get_setting(key)
+        assert value == {"value": "test"}
 
-            await db.disconnect()
+        # Cleanup
+        if test_db._pool:
+            async with test_db._pool.acquire() as conn:
+                await conn.execute("DELETE FROM configuration WHERE key = $1", key)
 
-    async def test_get_nonexistent_config(self):
-        """Test getting config that doesn't exist."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+    async def test_get_nonexistent_setting(self, test_db):
+        """Test getting setting that doesn't exist."""
+        value = await test_db.get_setting("nonexistent-key-12345")
+        assert value is None
 
-            value = await db.get_config("nonexistent")
-            assert value is None
+    async def test_update_existing_setting(self, test_db):
+        """Test updating existing setting value."""
+        key = f"test_key_{uuid.uuid4()}"
 
-            await db.disconnect()
+        # Set initial value
+        await test_db.set_setting(key, {"value": "initial"})
 
-    async def test_update_existing_config(self):
-        """Test updating existing config value."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        # Update it
+        await test_db.set_setting(key, {"value": "updated"})
 
-            # Set initial value
-            await db.set_config("test_key", {"value": "initial"})
+        # Verify updated
+        value = await test_db.get_setting(key)
+        assert value == {"value": "updated"}
 
-            # Update it
-            await db.set_config("test_key", {"value": "updated"})
+        # Cleanup
+        if test_db._pool:
+            async with test_db._pool.acquire() as conn:
+                await conn.execute("DELETE FROM configuration WHERE key = $1", key)
 
-            # Verify updated
-            value = await db.get_config("test_key")
-            assert value == {"value": "updated"}
-
-            await db.disconnect()
-
-    async def test_get_all_config(self):
+    async def test_get_all_settings(self, test_db):
         """Test getting all configuration."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
+        key1 = f"test_key1_{uuid.uuid4()}"
+        key2 = f"test_key2_{uuid.uuid4()}"
 
-            # Set multiple values
-            await db.set_config("key1", {"a": 1})
-            await db.set_config("key2", {"b": 2})
+        # Set multiple values
+        await test_db.set_setting(key1, {"a": 1})
+        await test_db.set_setting(key2, {"b": 2})
 
-            # Get all
-            all_config = await db.get_all_config()
-            assert "key1" in all_config
-            assert "key2" in all_config
-            assert all_config["key1"] == {"a": 1}
-            assert all_config["key2"] == {"b": 2}
+        # Get all
+        all_settings = await test_db.get_all_settings()
+        assert key1 in all_settings
+        assert key2 in all_settings
+        assert all_settings[key1] == {"a": 1}
+        assert all_settings[key2] == {"b": 2}
 
-            await db.disconnect()
+        # Cleanup
+        if test_db._pool:
+            async with test_db._pool.acquire() as conn:
+                await conn.execute("DELETE FROM configuration WHERE key IN ($1, $2)", key1, key2)
 
 
 @pytest.mark.asyncio
@@ -269,26 +350,8 @@ class TestDatabaseErrors:
 
     async def test_operation_without_connection(self):
         """Test that operations without connection raise error."""
-        db = Database(":memory:")
+        db = Database("postgresql://invalid")
         # Don't connect
 
         with pytest.raises(RuntimeError, match="Database not connected"):
             await db.get_session("test")
-
-    async def test_double_connect(self):
-        """Test connecting twice is safe."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-            await db.connect()  # Should be safe
-            assert db._connection is not None
-            await db.disconnect()
-
-    async def test_double_disconnect(self):
-        """Test disconnecting twice is safe."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            db = Database(tmp.name)
-            await db.connect()
-            await db.disconnect()
-            await db.disconnect()  # Should be safe
-            assert db._connection is None

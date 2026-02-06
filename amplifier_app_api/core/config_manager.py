@@ -159,8 +159,8 @@ class ConfigManager:
             # Validate config structure
             ConfigValidator.validate(parsed)
 
-        # Update fields
-        updates: dict[str, Any] = {"updated_at": datetime.now(UTC)}
+        # Update fields (updated_at is handled automatically by database)
+        updates: dict[str, Any] = {}
         if name is not None:
             updates["name"] = name
         if yaml_content is not None:
@@ -256,106 +256,211 @@ class ConfigManager:
         """
         return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
-    async def add_tool_to_config(
-        self,
-        config_id: str,
-        module: str,
-        source: str,
-        config: dict[str, Any] | None = None,
-    ) -> Config | None:
-        """Add a tool to a config's YAML.
+    # Bundle management operations
 
-        Args:
-            config_id: Config identifier
-            module: Tool module ID
-            source: Tool source URI
-            config: Tool configuration
+    async def list_bundles(self) -> dict[str, Any]:
+        """List all registered bundles.
 
         Returns:
-            Updated Config or None if not found
+            Dictionary mapping bundle names to their config (source, description, etc.)
         """
-        cfg = await self.get_config(config_id)
-        if not cfg:
-            return None
+        bundles = await self.db.get_setting("bundles")
+        return bundles or {}
 
-        # Parse YAML
-        data = self.parse_yaml(cfg.yaml_content)
+    async def get_active_bundle(self) -> str | None:
+        """Get the currently active bundle name.
 
-        # Add tool
-        if "tools" not in data:
-            data["tools"] = []
+        Returns:
+            Active bundle name or None if not set
+        """
+        return await self.db.get_setting("active_bundle")
 
-        tool_entry: dict[str, Any] = {"module": module, "source": source}
-        if config:
-            tool_entry["config"] = config
-
-        data["tools"].append(tool_entry)
-
-        # Update config
-        return await self.update_config(config_id, yaml_content=self.dump_yaml(data))
-
-    async def add_provider_to_config(
+    async def add_bundle(
         self,
-        config_id: str,
+        name: str,
+        source: str,
+        scope: str = "global",
+    ) -> None:
+        """Add a bundle to the registry.
+
+        Args:
+            name: Bundle name/alias
+            source: Bundle source URI (git URL or path)
+            scope: Bundle scope (global, project, local)
+        """
+        bundles = await self.list_bundles()
+        bundles[name] = {
+            "source": source,
+            "scope": scope,
+        }
+        await self.db.set_setting("bundles", bundles, scope="global")
+        logger.info(f"Added bundle: {name} from {source}")
+
+    async def remove_bundle(self, bundle_name: str) -> bool:
+        """Remove a bundle from the registry.
+
+        Args:
+            bundle_name: Name of bundle to remove
+
+        Returns:
+            True if removed, False if not found
+        """
+        bundles = await self.list_bundles()
+        if bundle_name not in bundles:
+            return False
+
+        del bundles[bundle_name]
+        await self.db.set_setting("bundles", bundles, scope="global")
+
+        # Clear active bundle if it was the removed one
+        active = await self.get_active_bundle()
+        if active == bundle_name:
+            await self.db.set_setting("active_bundle", None, scope="global")
+
+        logger.info(f"Removed bundle: {bundle_name}")
+        return True
+
+    async def set_active_bundle(self, bundle_name: str) -> None:
+        """Set the active bundle.
+
+        Args:
+            bundle_name: Name of bundle to activate
+        """
+        await self.db.set_setting("active_bundle", bundle_name, scope="global")
+        logger.info(f"Set active bundle: {bundle_name}")
+
+    # Tool registry operations
+
+    async def list_tools_registry(self) -> dict[str, Any]:
+        """List all registered tools from global registry.
+
+        Returns:
+            Dictionary mapping tool names to their config (source, description, etc.)
+        """
+        tools = await self.db.get_setting("tools")
+        return tools or {}
+
+    async def add_tool(
+        self,
+        name: str,
+        source: str,
+        module: str | None = None,
+        description: str | None = None,
+        config: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a tool to the global registry.
+
+        Args:
+            name: Tool name/alias
+            source: Tool source URI (git URL or path)
+            module: Tool module identifier (defaults to name)
+            description: Optional tool description
+            config: Optional tool configuration
+        """
+        tools = await self.list_tools_registry()
+        tools[name] = {
+            "source": source,
+            "module": module or name,
+            "description": description,
+            "config": config or {},
+        }
+        await self.db.set_setting("tools", tools, scope="global")
+        logger.info(f"Added tool to registry: {name} from {source}")
+
+    async def get_tool(self, tool_name: str) -> dict[str, Any] | None:
+        """Get a tool from the global registry.
+
+        Args:
+            tool_name: Name of tool to get
+
+        Returns:
+            Tool configuration or None if not found
+        """
+        tools = await self.list_tools_registry()
+        return tools.get(tool_name)
+
+    async def remove_tool(self, tool_name: str) -> bool:
+        """Remove a tool from the global registry.
+
+        Args:
+            tool_name: Name of tool to remove
+
+        Returns:
+            True if removed, False if not found
+        """
+        tools = await self.list_tools_registry()
+        if tool_name not in tools:
+            return False
+
+        del tools[tool_name]
+        await self.db.set_setting("tools", tools, scope="global")
+        logger.info(f"Removed tool from registry: {tool_name}")
+        return True
+
+    # Provider registry operations
+
+    async def list_providers_registry(self) -> dict[str, Any]:
+        """List all registered providers from global registry.
+
+        Returns:
+            Dictionary mapping provider names to their config (source, description, etc.)
+        """
+        providers = await self.db.get_setting("providers")
+        return providers or {}
+
+    async def add_provider_registry(
+        self,
+        name: str,
         module: str,
         source: str | None = None,
+        description: str | None = None,
         config: dict[str, Any] | None = None,
-    ) -> Config | None:
-        """Add a provider to a config's YAML.
+    ) -> None:
+        """Add a provider to the global registry.
 
         Args:
-            config_id: Config identifier
-            module: Provider module ID
-            source: Provider source URI
-            config: Provider configuration (including api_key)
-
-        Returns:
-            Updated Config or None if not found
+            name: Provider name/alias
+            module: Provider module identifier
+            source: Provider source URI (git URL or path, optional for installed packages)
+            description: Optional provider description
+            config: Optional default provider configuration
         """
-        cfg = await self.get_config(config_id)
-        if not cfg:
-            return None
+        providers = await self.list_providers_registry()
+        providers[name] = {
+            "module": module,
+            "source": source,
+            "description": description,
+            "config": config or {},
+        }
+        await self.db.set_setting("providers", providers, scope="global")
+        logger.info(f"Added provider to registry: {name} (module: {module})")
 
-        # Parse YAML
-        data = self.parse_yaml(cfg.yaml_content)
-
-        # Add provider
-        if "providers" not in data:
-            data["providers"] = []
-
-        provider_entry: dict[str, Any] = {"module": module}
-        if source:
-            provider_entry["source"] = source
-        if config:
-            provider_entry["config"] = config
-
-        data["providers"].append(provider_entry)
-
-        # Update config
-        return await self.update_config(config_id, yaml_content=self.dump_yaml(data))
-
-    async def merge_bundle_into_config(self, config_id: str, bundle_uri: str) -> Config | None:
-        """Add a bundle to the includes section of a config's YAML.
+    async def get_provider_registry(self, provider_name: str) -> dict[str, Any] | None:
+        """Get a provider from the global registry.
 
         Args:
-            config_id: Config identifier
-            bundle_uri: Bundle URI to include
+            provider_name: Name of provider to get
 
         Returns:
-            Updated Config or None if not found
+            Provider configuration or None if not found
         """
-        cfg = await self.get_config(config_id)
-        if not cfg:
-            return None
+        providers = await self.list_providers_registry()
+        return providers.get(provider_name)
 
-        # Parse YAML
-        data = self.parse_yaml(cfg.yaml_content)
+    async def remove_provider_registry(self, provider_name: str) -> bool:
+        """Remove a provider from the global registry.
 
-        # Add to includes
-        if "includes" not in data:
-            data["includes"] = []
+        Args:
+            provider_name: Name of provider to remove
 
-        data["includes"].append({"bundle": bundle_uri})
+        Returns:
+            True if removed, False if not found
+        """
+        providers = await self.list_providers_registry()
+        if provider_name not in providers:
+            return False
 
-        # Update config
-        return await self.update_config(config_id, yaml_content=self.dump_yaml(data))
+        del providers[provider_name]
+        await self.db.set_setting("providers", providers, scope="global")
+        logger.info(f"Removed provider from registry: {provider_name}")
+        return True

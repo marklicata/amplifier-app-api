@@ -7,20 +7,20 @@ services:
       # Override dev settings for production
       LOG_LEVEL: info
 
-      # Database
-      DATABASE_PASSWORD: $(az account get-access-token --resource https://ossrdbms-aad.database.windows.net --query accessToken --output tsv)
+      # Authentication - Production Settings
+      #############################################
+      AUTH_REQUIRED: false  # FALSE for now. Set to true when we are ready for production auth.
+      #############################################
 
-      
+      # Database - Production settings
+      DATABASE_HOST: amplifier-api-db-prod.postgres.database.azure.com
+      DATABASE_USER: amplifierdbprod
+
       # Telemetry - Production settings
       TELEMETRY_ENVIRONMENT: production
-      TELEMETRY_SAMPLE_RATE: 1.0
+      TELEMETRY_SAMPLE_RATE: 0.1  # Sample 10% in production
       TELEMETRY_ENABLE_DEV_LOGGER: false
-      TELEMETRY_APP_INSIGHTS_CONNECTION_STRING: InstrumentationKey=48206f3f-4628-4533-bac0-e37fe3753d26;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=fff618d3-3995-4fba-8598-e876efe15767
-
-      # Authentication Settings
-      AUTH_MODE: api_key_jwt
-      AUTH_REQUIRED: true
-      API_KEY_HEADER: X-API-Key
+      TELEMETRY_APP_INSIGHTS_CONNECTION_STRING: ${APP_INSIGHTS_CONNECTION_STRING}
       
       # Security - MUST override these
       SECRET_KEY: ${SECRET_KEY}  # Required: Generate with openssl rand -hex 32

@@ -17,7 +17,6 @@ class ConfigValidator:
 
     REQUIRED_FIELDS = {
         "bundle": {"name"},  # bundle.name is required
-        "session": {"orchestrator", "context"},  # session.orchestrator and session.context required
     }
 
     OPTIONAL_SECTIONS = {
@@ -61,15 +60,6 @@ class ConfigValidator:
         bundle_name = config_dict["bundle"].get("name")
         if not bundle_name or not isinstance(bundle_name, str):
             raise ConfigValidationError("bundle.name must be a non-empty string")
-
-        # Validate session.orchestrator and session.context are non-empty
-        orchestrator = config_dict["session"].get("orchestrator")
-        if not orchestrator or not isinstance(orchestrator, str):
-            raise ConfigValidationError("session.orchestrator must be a non-empty string")
-
-        context = config_dict["session"].get("context")
-        if not context or not isinstance(context, str):
-            raise ConfigValidationError("session.context must be a non-empty string")
 
         # Validate optional sections if present
         cls._validate_includes(config_dict.get("includes"))

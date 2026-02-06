@@ -14,9 +14,21 @@ services:
       SERVICE_WORKERS: 4
       LOG_LEVEL: info
 
-      # Database
-      DATABASE_URL: sqlite+aiosqlite:///data/amplifier.db
+      # Authentication Settings
+      AUTH_MODE: api_key_jwt
+      AUTH_REQUIRED: false
+      API_KEY_HEADER: X-API-Key
 
+      # Database
+      DATABASE_HOST: amplifier-api-db-dev.postgres.database.azure.com
+      DATABASE_USER: amplifierdbtest
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-}
+      DATABASE_PORT: 5432
+      DATABASE_NAME: postgres
+      DATABASE_SSL_MODE: require
+      DATABASE_POOL_MIN_SIZE: 5
+      DATABASE_POOL_MAX_SIZE: 10
+      
       # Security
       SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
       ALGORITHM: HS256
@@ -51,10 +63,6 @@ services:
       # Persist database and sessions
       - amplifier-data:/data
       
-      # Mount local forks (adjust paths as needed)
-      - ../amplifier-core:/app/amplifier-core:ro
-      - ../amplifier-foundation:/app/amplifier-foundation:ro
-
     restart: unless-stopped
 
     healthcheck:

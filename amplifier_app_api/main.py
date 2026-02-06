@@ -14,6 +14,7 @@ from .api import (
     bundles_router,
     config_router,
     health_router,
+    providers_router,
     sessions_router,
     tools_router,
 )
@@ -141,6 +142,7 @@ app.include_router(sessions_router)
 app.include_router(config_router)
 app.include_router(bundles_router)
 app.include_router(tools_router)
+app.include_router(providers_router)
 
 # Import and register smoke tests router (after app is defined to avoid circular import)
 from .api.smoke import router as smoke_router  # noqa: E402

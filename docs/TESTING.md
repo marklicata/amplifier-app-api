@@ -28,10 +28,10 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 ### Statistics
 
-- **Total test files:** 21
-- **Total test cases:** 180+ (67 passing unit/auth + 121+ E2E tests)
-- **Lines of test code:** 8,000+
-- **API endpoint coverage:** 100% (34/34 endpoints)
+- **Total test files:** 33
+- **Total test cases:** 400+
+- **Lines of test code:** 12,000+
+- **API endpoint coverage:** 100% (37/37 endpoints)
 - **E2E coverage:** All endpoints tested with real HTTP server
 - **Test types:** Unit, Integration, E2E
 
@@ -136,7 +136,7 @@ See [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) for detailed authen
 - **`test_e2e_all_endpoints.py`** (40+ tests) - All endpoints existence validation
 - **`test_e2e_live_service.py`** (25+ tests) - Live service validation
 
-**Total E2E Tests:** 121+ tests covering all 34 endpoints with real HTTP requests
+**Total E2E Tests:** 121+ tests covering all 37 endpoints with real HTTP requests
 
 **Note:** E2E tests start a real uvicorn server on port 8767. First run is slow (bundle downloads). Subsequent runs use cache.
 
@@ -235,11 +235,11 @@ curl "http://localhost:8765/smoke-tests?verbose=true"
 
 ## 📋 Test Coverage by Endpoint
 
-### Configuration (8 endpoints)
+### Configuration (5 endpoints)
 - ✅ Config CRUD operations (create, read, update, delete)
-- ✅ Programmatic helpers (add tool, provider, bundle)
 - ✅ YAML validation and parsing
 - ✅ Pagination and filtering
+- ✅ Update via PUT for all modifications
 
 ### Sessions (8 endpoints)
 - ✅ Session lifecycle (create, resume, delete)
@@ -254,14 +254,21 @@ curl "http://localhost:8765/smoke-tests?verbose=true"
 - ✅ Application management (list, get, delete)
 
 ### Bundles (5 endpoints)
-- ✅ Bundle discovery and loading
-- ✅ Tool enumeration
-- ✅ Validation
+- ✅ Bundle registry operations
+- ✅ Bundle activation
+- ✅ Discovery and listing
 
-### Tools (3 endpoints)
-- ✅ Tool discovery
+### Tools (5 endpoints)
+- ✅ Global tool registry
+- ✅ Tool discovery from bundles
 - ✅ Tool invocation
-- ✅ Bundle-scoped tools
+
+### Providers (4 endpoints)
+- ✅ Global provider registry
+- ✅ Provider discovery
+- ✅ Provider management
+
+
 
 ### Health & Testing (5 endpoints)
 - ✅ Health checks and version info

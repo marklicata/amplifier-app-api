@@ -274,65 +274,69 @@ curl -X PUT http://localhost:8765/configs/{config_id} \
 
 ---
 
-## Step 5: Test Programmatic Config Helpers
+## Step 5: Update Config with Additional Components
 
-### 5.1 Add a Tool to Config
+To add more tools, providers, or bundles to a config, update the YAML via PUT:
+
+### 5.1 Get Current Config
 ```bash
-curl -X POST "http://localhost:8765/configs/{config_id}/tools?tool_module=tool-search&tool_source=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2Famplifier-module-tool-search%40main" \
+CONFIG_ID="your-config-id-from-step-2"
+curl http://localhost:8765/configs/$CONFIG_ID | jq -r '.yaml_content' > current.yaml
+```
+
+### 5.2 Modify the YAML
+
+Edit `current.yaml` to add components:
+
+```yaml
+bundle:
+  name: test-minimal
+  version: 2.0.0
+
+includes:
+  - bundle: foundation
+  - bundle: recipes  # Added
+
+session:
+  orchestrator: loop-streaming  # Changed from loop-basic
+  context: context-persistent    # Changed from context-simple
+
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: sk-test-key
+      model: claude-sonnet-4-5
+  - module: provider-openai  # Added
+    config:
+      api_key: ${OPENAI_API_KEY}
+      model: gpt-4o
+
+tools:  # Added section
+  - module: tool-filesystem
+  - module: tool-bash
+  - module: tool-search
+    config:
+      timeout_seconds: 30
+```
+
+### 5.3 Update Config
+
+```bash
+# Read modified YAML and update
+UPDATED_YAML=$(cat current.yaml)
+
+curl -X PUT "http://localhost:8765/configs/$CONFIG_ID" \
   -H "Content-Type: application/json" \
-  -d '{
-    "timeout_seconds": 30,
-    "max_results": 10
-  }'
+  -d "{\"yaml_content\": $(echo "$UPDATED_YAML" | jq -Rs .)}"
 ```
 
-**Expected:** Returns updated config with tool-search added to tools array
+**Expected:** `200 OK` with updated configuration
 
 **Verify:**
 ```bash
-# Get the config and check YAML
-curl http://localhost:8765/configs/{config_id} | jq -r '.yaml_content'
+curl http://localhost:8765/configs/$CONFIG_ID | jq -r '.yaml_content'
+# Should show all your changes
 ```
-
-Should show `tool-search` in the tools array.
-
----
-
-### 5.2 Add a Provider to Config
-```bash
-curl -X POST "http://localhost:8765/configs/{config_id}/providers?provider_module=provider-openai" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "api_key": "${OPENAI_API_KEY}",
-    "model": "gpt-4o"
-  }'
-```
-
-**Expected:** Returns updated config with provider-openai added
-
-**Verify:**
-```bash
-curl http://localhost:8765/configs/{config_id} | jq -r '.yaml_content'
-```
-
-Should show both provider-anthropic and provider-openai.
-
----
-
-### 5.3 Merge a Bundle into Config
-```bash
-curl -X POST "http://localhost:8765/configs/{config_id}/bundles?bundle_uri=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2Famplifier-bundle-recipes%40main" \
-  -H "Content-Type: application/json"
-```
-
-**Expected:** Returns updated config with recipes bundle in includes
-
-**Verify:**
-```bash
-curl http://localhost:8765/configs/{config_id} | jq -r '.yaml_content'
-```
-
-Should show both foundation and recipes in includes array.
 
 ---
 

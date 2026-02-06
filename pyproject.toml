@@ -14,12 +14,20 @@ dependencies = [
     "pyyaml>=6.0.3",
     "httpx>=0.28.1",
     "python-multipart>=0.0.9",
-    "aiosqlite>=0.20.0",
+    "asyncpg>=0.29.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "amplifier-core",
     "amplifier-foundation",
     "opencensus-ext-azure>=1.1.13",
+    "azure-identity>=1.25.1",
+    # Provider SDK dependencies - pre-install common ones
+    "anthropic>=0.40.0",              # For provider-anthropic
+    "openai>=1.0.0",                  # For provider-openai and provider-azure-openai
+    "google-generativeai>=0.8.0",    # For provider-google/provider-gemini
+    "ollama>=0.4.0",                  # For provider-ollama
+    "boto3>=1.35.0",                  # For provider-bedrock (AWS)
+    "cohere>=5.0.0",                  # For provider-cohere
 ]
 
 [project.scripts]

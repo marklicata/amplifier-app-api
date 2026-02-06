@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SessionCreateRequest(BaseModel):
@@ -27,7 +27,7 @@ class SessionCreateRequest(BaseModel):
 class MessageRequest(BaseModel):
     """Request to send a message to a session."""
 
-    message: str = Field(..., description="User message content")
+    message: str = Field(..., description="User message content", min_length=1)
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
 
 
@@ -53,7 +53,16 @@ class BundleAddRequest(BaseModel):
 
     source: str = Field(..., description="Bundle source (git URL or path)")
     name: str | None = Field(default=None, description="Bundle alias")
-    scope: str = Field(default="global", description="Bundle scope")
+    scope: str = Field(default="global", description="Bundle scope (global, project, user)")
+
+    @field_validator("scope")
+    @classmethod
+    def validate_scope(cls, v: str) -> str:
+        """Validate scope is one of the allowed values."""
+        allowed = {"global", "project", "user", "local"}
+        if v not in allowed:
+            raise ValueError(f"scope must be one of {allowed}, got '{v}'")
+        return v
 
 
 class RecipeExecuteRequest(BaseModel):
@@ -68,3 +77,6 @@ class ToolInvokeRequest(BaseModel):
 
     tool_name: str = Field(..., description="Tool name to invoke")
     parameters: dict[str, Any] = Field(default_factory=dict, description="Tool parameters")
+    bundle_name: str | None = Field(
+        default=None, description="Bundle to use (optional, defaults to active or foundation)"
+    )

@@ -54,45 +54,45 @@ async def create_application(
 ) -> ApplicationResponse:
     """Register a new application."""
     try:
-        # Check if app_id already exists
-        if db._connection:
-            cursor = await db._connection.execute(
-                "SELECT app_id FROM applications WHERE app_id = ?", (request.app_id,)
+        if not db._pool:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
+        async with db._pool.acquire() as conn:
+            # Check if app_id already exists
+            existing = await conn.fetchval(
+                "SELECT app_id FROM applications WHERE app_id = $1", request.app_id
             )
-            if await cursor.fetchone():
+            if existing:
                 raise HTTPException(
                     status_code=409,
                     detail=f"Application '{request.app_id}' already exists",
                 )
 
-        # Generate API key
-        api_key = generate_api_key()
+            # Generate API key
+            api_key = generate_api_key()
 
-        # Hash the API key
-        api_key_hash = bcrypt.hashpw(api_key.encode(), bcrypt.gensalt()).decode()
+            # Hash the API key
+            api_key_hash = bcrypt.hashpw(api_key.encode(), bcrypt.gensalt()).decode()
 
-        # Create application
-        from datetime import UTC, datetime
+            # Create application
+            from datetime import UTC, datetime
 
-        now = datetime.now(UTC)
+            now = datetime.now(UTC)
 
-        if db._connection:
-            await db._connection.execute(
+            await conn.execute(
                 """
-                INSERT INTO applications 
+                INSERT INTO applications
                 (app_id, app_name, api_key_hash, is_active, created_at, updated_at, settings)
-                VALUES (?, ?, ?, 1, ?, ?, ?)
+                VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
                 """,
-                (
-                    request.app_id,
-                    request.app_name,
-                    api_key_hash,
-                    now.isoformat(),
-                    now.isoformat(),
-                    "{}",
-                ),
+                request.app_id,
+                request.app_name,
+                api_key_hash,
+                True,
+                now,
+                now,
+                "{}",
             )
-            await db._connection.commit()
 
         logger.info(f"Application registered: {request.app_id}")
 
@@ -120,27 +120,25 @@ async def create_application(
 async def list_applications(db: Database = Depends(get_db)) -> list[ApplicationInfo]:
     """List all registered applications."""
     try:
-        if not db._connection:
+        if not db._pool:
             raise HTTPException(status_code=503, detail="Database not connected")
 
-        cursor = await db._connection.execute(
-            """
-            SELECT app_id, app_name, is_active, created_at, updated_at
-            FROM applications
-            ORDER BY created_at DESC
-            """
-        )
-        rows = await cursor.fetchall()
-
-        from datetime import datetime
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT app_id, app_name, is_active, created_at, updated_at
+                FROM applications
+                ORDER BY created_at DESC
+                """
+            )
 
         return [
             ApplicationInfo(
                 app_id=row["app_id"],
                 app_name=row["app_name"],
                 is_active=bool(row["is_active"]),
-                created_at=datetime.fromisoformat(row["created_at"]),
-                updated_at=datetime.fromisoformat(row["updated_at"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
             )
             for row in rows
         ]
@@ -164,30 +162,28 @@ async def get_application(
 ) -> ApplicationInfo:
     """Get application details."""
     try:
-        if not db._connection:
+        if not db._pool:
             raise HTTPException(status_code=503, detail="Database not connected")
 
-        cursor = await db._connection.execute(
-            """
-            SELECT app_id, app_name, is_active, created_at, updated_at
-            FROM applications
-            WHERE app_id = ?
-            """,
-            (app_id,),
-        )
-        row = await cursor.fetchone()
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT app_id, app_name, is_active, created_at, updated_at
+                FROM applications
+                WHERE app_id = $1
+                """,
+                app_id,
+            )
 
         if not row:
             raise HTTPException(status_code=404, detail="Application not found")
-
-        from datetime import datetime
 
         return ApplicationInfo(
             app_id=row["app_id"],
             app_name=row["app_name"],
             is_active=bool(row["is_active"]),
-            created_at=datetime.fromisoformat(row["created_at"]),
-            updated_at=datetime.fromisoformat(row["updated_at"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     except HTTPException:
@@ -208,19 +204,19 @@ async def delete_application(
 ) -> dict[str, Any]:
     """Delete an application."""
     try:
-        if not db._connection:
+        if not db._pool:
             raise HTTPException(status_code=503, detail="Database not connected")
 
-        # Check if exists
-        cursor = await db._connection.execute(
-            "SELECT app_id FROM applications WHERE app_id = ?", (app_id,)
-        )
-        if not await cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Application not found")
+        async with db._pool.acquire() as conn:
+            # Check if exists
+            existing = await conn.fetchval(
+                "SELECT app_id FROM applications WHERE app_id = $1", app_id
+            )
+            if not existing:
+                raise HTTPException(status_code=404, detail="Application not found")
 
-        # Delete
-        await db._connection.execute("DELETE FROM applications WHERE app_id = ?", (app_id,))
-        await db._connection.commit()
+            # Delete
+            await conn.execute("DELETE FROM applications WHERE app_id = $1", app_id)
 
         logger.info(f"Application deleted: {app_id}")
         return {"message": f"Application '{app_id}' deleted successfully"}
@@ -249,33 +245,34 @@ async def regenerate_api_key(
 ) -> ApplicationResponse:
     """Regenerate API key for an application."""
     try:
-        if not db._connection:
+        if not db._pool:
             raise HTTPException(status_code=503, detail="Database not connected")
 
-        # Check if exists
-        cursor = await db._connection.execute(
-            "SELECT app_name, is_active, created_at FROM applications WHERE app_id = ?",
-            (app_id,),
-        )
-        row = await cursor.fetchone()
+        async with db._pool.acquire() as conn:
+            # Check if exists
+            row = await conn.fetchrow(
+                "SELECT app_name, is_active, created_at FROM applications WHERE app_id = $1",
+                app_id,
+            )
 
-        if not row:
-            raise HTTPException(status_code=404, detail="Application not found")
+            if not row:
+                raise HTTPException(status_code=404, detail="Application not found")
 
-        # Generate new API key
-        api_key = generate_api_key()
-        api_key_hash = bcrypt.hashpw(api_key.encode(), bcrypt.gensalt()).decode()
+            # Generate new API key
+            api_key = generate_api_key()
+            api_key_hash = bcrypt.hashpw(api_key.encode(), bcrypt.gensalt()).decode()
 
-        # Update in database
-        from datetime import UTC, datetime
+            # Update in database
+            from datetime import UTC, datetime
 
-        now = datetime.now(UTC)
+            now = datetime.now(UTC)
 
-        await db._connection.execute(
-            "UPDATE applications SET api_key_hash = ?, updated_at = ? WHERE app_id = ?",
-            (api_key_hash, now.isoformat(), app_id),
-        )
-        await db._connection.commit()
+            await conn.execute(
+                "UPDATE applications SET api_key_hash = $1, updated_at = $2 WHERE app_id = $3",
+                api_key_hash,
+                now,
+                app_id,
+            )
 
         logger.info(f"API key regenerated for: {app_id}")
 
@@ -284,7 +281,7 @@ async def regenerate_api_key(
             app_name=row["app_name"],
             api_key=api_key,  # New API key
             is_active=bool(row["is_active"]),
-            created_at=datetime.fromisoformat(row["created_at"]),
+            created_at=row["created_at"],
             message="API key regenerated successfully",
         )
 

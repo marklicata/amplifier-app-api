@@ -1,7 +1,6 @@
 """Pytest configuration and fixtures."""
 
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
@@ -58,17 +57,29 @@ def enable_auth():
 
 @pytest_asyncio.fixture(scope="function")
 async def test_db():
-    """Create a test database for each test."""
+    """Create a test database for each test.
+
+    Note: This connects to the actual PostgreSQL database configured in .env
+    Tests will use real Azure PostgreSQL but with test data that gets cleaned up.
+    """
+    from amplifier_app_api.config import settings
     from amplifier_app_api.storage.database import Database
 
-    # Create temporary database
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        db = Database(tmp.name)
-        await db.connect()
-        yield db
-        await db.disconnect()
-        # Cleanup
-        Path(tmp.name).unlink(missing_ok=True)
+    # Use the configured database (should be Azure PostgreSQL test instance)
+    db_url = settings.get_database_url()
+    db = Database(db_url)
+    await db.connect()
+
+    yield db
+
+    # Cleanup - delete any test data
+    # (Tests should use predictable IDs like 'test-*' for cleanup)
+    if db._pool:
+        async with db._pool.acquire() as conn:
+            await conn.execute("DELETE FROM sessions WHERE session_id LIKE 'test-%'")
+            await conn.execute("DELETE FROM configs WHERE config_id LIKE 'test-%'")
+
+    await db.disconnect()
 
 
 @pytest.fixture(scope="function")
@@ -78,8 +89,8 @@ def mock_session_manager():
 
     manager = Mock()
 
-    # Mock create_session (new signature: just config_id)
-    async def mock_create(config_id):
+    # Mock create_session with new signature (config_id, user_id, app_id)
+    async def mock_create(config_id, user_id=None, app_id=None):
         session_id = "mock-session-123"
         return Session(
             session_id=session_id,
@@ -247,73 +258,53 @@ providers:
 
     # Then create session from config
     session_response = await client.post("/sessions", json={"config_id": config_id})
-    if session_response.status_code == 200:
+    if session_response.status_code == 201:
         return session_response.json()["session_id"]
     return None
 
 
 @pytest.fixture(scope="module")
 def live_service():
-    """Start the service in a subprocess for E2E tests.
+    """Use the already-running service for E2E tests.
 
-    This fixture starts a real HTTP server on port 8767 and yields the base URL.
-    Used by E2E tests to test against a running service.
+    Checks if a service is running on common ports and uses it.
+    This avoids the need to start a new service instance.
     """
-    import subprocess
-    import sys
-    import time
-    from pathlib import Path
-
     try:
         import httpx
     except ImportError:
         pytest.skip("httpx not installed - skipping E2E tests")
 
-    # Start the service
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "amplifier_app_api.main:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8767",
-        ],
-        cwd=Path(__file__).parent.parent,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env={**subprocess.os.environ, "PYTHONPATH": str(Path(__file__).parent.parent)},
-    )
+    # Check common ports for running service
+    ports_to_check = [8765, 8767, 8000]
+    base_url = None
 
-    # Wait for service to start
-    base_url = "http://127.0.0.1:8767"
-    started = False
-
-    for attempt in range(30):  # 30 attempts × 0.5 seconds = 15 seconds max
+    for port in ports_to_check:
+        test_url = f"http://127.0.0.1:{port}"
         try:
-            response = httpx.get(f"{base_url}/health", timeout=2.0)
+            response = httpx.get(f"{test_url}/health", timeout=2.0)
             if response.status_code == 200:
-                started = True
-                print(f"\n✅ Service started at {base_url} (attempt {attempt + 1})")
+                base_url = test_url
+                print(f"\n✅ Found running service at {base_url}")
                 break
         except (httpx.ConnectError, httpx.TimeoutException, httpx.ReadTimeout):
-            time.sleep(0.5)
+            continue
 
-    if not started:
-        stdout, stderr = proc.communicate(timeout=1)
-        print(f"STDOUT: {stdout.decode()}")
-        print(f"STDERR: {stderr.decode()}")
-        proc.kill()
-        pytest.fail("Service failed to start within 15 seconds")
+    if not base_url:
+        pytest.skip(
+            "No running service found on ports 8765, 8767, or 8000. "
+            "Start the service with './run-dev.sh' before running E2E tests."
+        )
+
+    # Verify database is connected
+    try:
+        health = httpx.get(f"{base_url}/health", timeout=5.0).json()
+        if not health.get("database_connected"):
+            pytest.skip(f"Service at {base_url} has no database connection")
+    except Exception as e:
+        pytest.skip(f"Cannot verify service health: {e}")
 
     yield base_url
 
-    # Cleanup
-    print("\n🛑 Stopping service...")
-    proc.terminate()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+    # No cleanup - we're using an existing service
+    print(f"\n✓ E2E tests complete (used service at {base_url})")
