@@ -70,8 +70,7 @@ jobs:
           file: ./Dockerfile
           load: true
           tags: amplifier-app-api:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true  # Always build/deploy without cache to ensure latest dependencies and code
 
       - name: Test Docker image
         run: |
@@ -133,6 +132,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          no-cache: true  # Always build/deploy without cache to ensure latest dependencies and code
           tags: |
             ${{ secrets.ACR_REGISTRY }}/amplifier-app-api:latest
             ${{ secrets.ACR_REGISTRY }}/amplifier-app-api:${{ github.sha }}
