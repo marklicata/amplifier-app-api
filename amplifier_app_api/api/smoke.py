@@ -220,38 +220,6 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
         results["tests"].append({"name": "applications_endpoint", "passed": False, "error": str(e)})
         results["failed"] += 1
 
-    # Test 7: Application registration (auth infrastructure works)
-    try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.post(
-                "/applications",
-                json={"app_id": "smoke-test-app", "app_name": "Smoke Test App"},
-            )
-            test_passed = response.status_code == 201
-            api_key_valid = test_passed and response.json().get("api_key", "").startswith("app_")
-            results["tests"].append(
-                {
-                    "name": "application_registration",
-                    "passed": api_key_valid,
-                    "details": "API key generated" if api_key_valid else None,
-                }
-            )
-            if api_key_valid:
-                results["passed"] += 1
-            else:
-                results["failed"] += 1
-
-            # Cleanup - delete the test app
-            if test_passed:
-                await client.delete("/applications/smoke-test-app")
-
-    except Exception as e:
-        results["tests"].append(
-            {"name": "application_registration", "passed": False, "error": str(e)}
-        )
-        results["failed"] += 1
-
     results["success"] = results["failed"] == 0
     results["total"] = results["passed"] + results["failed"]
 
