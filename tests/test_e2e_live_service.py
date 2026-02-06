@@ -107,33 +107,12 @@ class TestLiveServiceSessions:
 
     def test_create_session_real_http(self, live_service):
         """Test creating a session with real HTTP."""
-        # First create a config
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "test-config",
-                "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
-            },
-            timeout=30.0,
-        )
+        # Use e2e_test_bundle from environment
+        import os
 
-        if config_response.status_code != 200:
-            return
-
-        config_id = config_response.json()["config_id"]
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set")
 
         # Then create session from config
         response = httpx.post(

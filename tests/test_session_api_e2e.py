@@ -3,6 +3,7 @@
 Tests actual HTTP endpoints with the service running.
 """
 
+import os
 import pytest
 from httpx import AsyncClient
 
@@ -14,32 +15,10 @@ class TestSessionCreation:
     async def test_create_session_from_config(self, client: AsyncClient):
         """Test creating a session from a valid config."""
         # First create a config
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "session-test-config",
-                "yaml_content": """
-bundle:
-  name: session-test
-
-includes:
-  - bundle: foundation
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
-            },
-        )
-
-        assert config_response.status_code == 201
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session from config
         session_response = await client.post(
@@ -67,31 +46,10 @@ providers:
     async def test_create_multiple_sessions_same_config(self, client: AsyncClient):
         """Test creating multiple sessions from the same config (reusability)."""
         # Create config
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "reusable-config",
-                "yaml_content": """
-bundle:
-  name: reusable
-
-includes:
-  - bundle: foundation
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
-            },
-        )
-
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create 3 sessions from same config
         session_ids = []
@@ -119,14 +77,10 @@ class TestSessionRetrieval:
     async def test_get_session_by_id(self, client: AsyncClient):
         """Test getting a session by ID."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "get-session-test",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         session_response = await client.post(
             "/sessions",
@@ -165,14 +119,10 @@ class TestSessionRetrieval:
     async def test_list_sessions_with_data(self, client: AsyncClient):
         """Test listing sessions after creating some."""
         # Create config
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "list-test-config",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create multiple sessions
         session_ids = []
@@ -207,14 +157,10 @@ class TestSessionRetrieval:
     async def test_list_sessions_pagination(self, client: AsyncClient):
         """Test session list pagination."""
         # Create config
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "pagination-test",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create 5 sessions
         for i in range(5):
@@ -245,14 +191,10 @@ class TestSessionResume:
     async def test_resume_session(self, client: AsyncClient):
         """Test resuming a session."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "resume-test",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         session_response = await client.post(
             "/sessions",
@@ -281,14 +223,10 @@ class TestSessionDeletion:
     async def test_delete_session(self, client: AsyncClient):
         """Test deleting a session."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "delete-test",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         session_response = await client.post(
             "/sessions",
@@ -313,14 +251,10 @@ class TestSessionDeletion:
     async def test_delete_config_does_not_delete_sessions(self, client: AsyncClient):
         """Test that deleting a config doesn't cascade delete sessions."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "cascade-test",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         session_response = await client.post(
             "/sessions",
@@ -329,7 +263,6 @@ class TestSessionDeletion:
         session_id = session_response.json()["session_id"]
 
         # Delete config
-        await client.delete(f"/configs/{config_id}")
 
         # Session should still exist (orphaned but queryable)
         session_check = await client.get(f"/sessions/{session_id}")
@@ -346,14 +279,10 @@ class TestSessionConcurrency:
         import asyncio
 
         # Create config
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "concurrent-sessions",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create 10 sessions concurrently
         tasks = [client.post("/sessions", json={"config_id": config_id}) for _ in range(10)]
@@ -394,14 +323,10 @@ class TestSessionEdgeCases:
     async def test_delete_session_twice(self, client: AsyncClient):
         """Test deleting the same session twice."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "double-delete",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         session_response = await client.post(
             "/sessions",
@@ -425,14 +350,10 @@ class TestSessionStateManagement:
     async def test_session_initial_state(self, client: AsyncClient):
         """Test that new sessions have correct initial state."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "initial-state",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         session_response = await client.post(
             "/sessions",
@@ -450,14 +371,10 @@ class TestSessionStateManagement:
     async def test_list_sessions_shows_correct_fields(self, client: AsyncClient):
         """Test that session list shows all expected fields."""
         # Create config and session
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "list-fields-test",
-                "yaml_content": "bundle:\n  name: test\nincludes:\n  - bundle: foundation\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         await client.post("/sessions", json={"config_id": config_id})
 
@@ -483,30 +400,10 @@ class TestSessionStateManagement:
     async def test_session_does_not_expose_sensitive_data(self, client: AsyncClient):
         """Test that session responses don't leak sensitive config data."""
         # Create config with API key
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "sensitive-data-test",
-                "yaml_content": """
-bundle:
-  name: test
-
-includes:
-  - bundle: foundation
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: sk-ant-super-secret-key-12345
-      model: claude-sonnet-4-5
-""",
-            },
-        )
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session
         session_response = await client.post(

@@ -8,6 +8,7 @@ Requirements:
 - Foundation bundle available
 """
 
+import os
 import pytest
 
 try:

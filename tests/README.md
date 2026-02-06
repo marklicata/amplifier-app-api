@@ -24,8 +24,14 @@ python3 -m pytest tests/test_database_participants_comprehensive.py -v
 
 ### E2E Tests (require service to be running)
 ```bash
-# Note: E2E tests start a real server on port 8767
-python3 -m pytest tests/test_e2e_all_endpoints.py -v -m e2e
+# Ensure service is running
+curl http://localhost:8765/health
+
+# Set E2E bundle ID (from .env or export)
+export E2E_TEST_BUNDLE_ID=your-working-config-id
+
+# Run E2E tests
+python3 -m pytest tests/ -m e2e -v
 ```
 
 ## Test Organization
@@ -56,6 +62,16 @@ python3 -m pytest tests/test_e2e_all_endpoints.py -v -m e2e
 | `test_smoke.py` | 13 | Quick smoke tests |
 
 ### E2E Tests (Real HTTP Server)
+
+**Prerequisites:** E2E tests require the `E2E_TEST_BUNDLE_ID` environment variable set to a working config ID.
+
+```bash
+# Set in .env file:
+E2E_TEST_BUNDLE_ID=your-working-config-id
+
+# Or export before running:
+export E2E_TEST_BUNDLE_ID=your-working-config-id
+```
 
 | File | Tests | Coverage |
 |------|-------|----------|

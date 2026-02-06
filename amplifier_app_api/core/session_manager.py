@@ -53,7 +53,7 @@ class SessionManager:
 
             # Create a BundleRegistry for loading bundles
             self.registry = BundleRegistry()
-            
+
             # Mark that we need to populate registry on first use
             self._registry_populated = False
 
@@ -90,34 +90,75 @@ class SessionManager:
             logger.error(f"Failed to find bundle {bundle_name}: {e}")
             raise ValueError(f"Could not find bundle '{bundle_name}': {e}") from e
 
-    async def _ensure_foundation_available(self) -> None:
-        """Ensure foundation bundle is loaded and modules are available.
+    async def _populate_registry(self) -> None:
+        """Populate the BundleRegistry with bundles from the database.
 
-        This loads the foundation bundle once per SessionManager instance,
-        making core modules like loop-basic and context-simple available
-        for all sessions.
+        This loads the bundle registry once per SessionManager instance,
+        allowing bundles to be resolved by name.
         """
-        if hasattr(self, "_foundation_prepared"):
+        if self._registry_populated:
             return
 
         try:
-            logger.info("Loading foundation bundle...")
+            # Get bundles from database
+            bundles = await self.config_manager.list_bundles()
+            logger.info(f"Populating registry with {len(bundles)} bundles from database")
 
-            # Load foundation through registry
-            foundation_bundle = await self.registry.load("foundation")
+            # Convert to dict[str, str] format expected by registry.register()
+            bundle_sources = {
+                name: info["source"] for name, info in bundles.items() if info.get("source")
+            }
 
-            # Prepare it to activate modules
+            # Register all bundles at once
+            self.registry.register(bundle_sources)
+            logger.info(f"Registered {len(bundle_sources)} bundles with registry")
+
+            # Store bundle sources for use in source_resolver
+            self._bundle_sources = bundle_sources
+
+            self._registry_populated = True
+            logger.info("Bundle registry populated successfully")
+        except Exception as e:
+            logger.error(f"Failed to populate bundle registry: {e}", exc_info=True)
+            raise RuntimeError(f"Could not populate bundle registry: {e}") from e
+
+    async def _ensure_registry_populated(self) -> None:
+        """Ensure the bundle registry is populated.
+
+        This is needed so that config bundles can resolve their includes
+        like 'bundle: foundation' through the registry.
+        """
+        await self._populate_registry()
+
+    async def _ensure_foundation_loaded(self) -> None:
+        """Ensure foundation bundle is loaded and prepared globally.
+
+        This loads foundation once per SessionManager, making its core modules
+        (loop-basic, context-simple, etc.) globally available for all configs.
+        """
+        if hasattr(self, "_foundation_loaded"):
+            return
+
+        try:
+            await self._ensure_registry_populated()
+
+            logger.info("Loading foundation bundle to activate core modules...")
+
+            if not hasattr(self, "_bundle_sources") or "foundation" not in self._bundle_sources:
+                raise ValueError("Foundation bundle not found in registry")
+
+            foundation_source = self._bundle_sources["foundation"]
+
+            # Load and prepare foundation bundle to make modules globally available
+            foundation_bundle = await self.registry.load(foundation_source)
             await foundation_bundle.prepare(install_deps=False)
 
-            self._foundation_prepared = True
-            logger.info("Foundation bundle loaded successfully - core modules are now available")
+            self._foundation_loaded = True
+            logger.info("Foundation bundle loaded - core modules now globally available")
+
         except Exception as e:
             logger.error(f"Failed to load foundation bundle: {e}", exc_info=True)
-            raise RuntimeError(
-                "Could not load required foundation bundle. "
-                "This bundle provides core modules like loop-basic and context-simple. "
-                f"Error: {e}"
-            ) from e
+            raise RuntimeError(f"Could not load foundation bundle: {e}") from e
 
     async def _get_or_prepare_config_bundle(self, config_id: str) -> Any:
         """Get or prepare a bundle from a config YAML.
@@ -132,8 +173,9 @@ class SessionManager:
             ValueError: If config not found or YAML is invalid
             RuntimeError: If bundle preparation fails
         """
-        # Ensure foundation is loaded first (provides core modules like loop-basic, context-simple)
-        await self._ensure_foundation_available()
+
+        # Ensure registry is populated so the config bundle can resolve its includes (like 'bundle: foundation')
+        await self._ensure_registry_populated()
 
         if config_id in self._prepared_bundles:
             logger.info(f"Using cached bundle for config: {config_id}")

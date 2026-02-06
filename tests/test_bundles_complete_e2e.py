@@ -7,6 +7,7 @@ Requirements:
 - amplifier-core and amplifier-foundation configured
 """
 
+import os
 import pytest
 
 try:
