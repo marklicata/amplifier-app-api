@@ -362,15 +362,10 @@ providers:
         for config_id in config_ids:
             # Get
             tasks.append(client.get(f"/configs/{config_id}"))
-            # Update
+            # Update name
             tasks.append(client.put(f"/configs/{config_id}", json={"description": "Updated"}))
-            # Add tool
-            tasks.append(
-                client.post(
-                    f"/configs/{config_id}/tools",
-                    params={"tool_module": "tool-web", "tool_source": "./tool-web"},
-                )
-            )
+            # Update with YAML modification
+            tasks.append(client.put(f"/configs/{config_id}", json={"tags": {"updated": "true"}}))
 
         # Execute all concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)

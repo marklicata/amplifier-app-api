@@ -62,6 +62,9 @@ class TestSessionModels:
         """Test Session with transcript."""
         session = Session(
             session_id="test-123",
+            config_id="test-config-id",
+            status=SessionStatus.ACTIVE,
+            metadata=SessionMetadata(config_id="test-config-id"),
             transcript=[
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
@@ -165,10 +168,13 @@ class TestModelSerialization:
         """Test Session serialization to dict."""
         session = Session(
             session_id="test-123",
+            config_id="test-config-id",
             status=SessionStatus.ACTIVE,
+            metadata=SessionMetadata(config_id="test-config-id"),
         )
         data = session.model_dump()
         assert data["session_id"] == "test-123"
+        assert data["config_id"] == "test-config-id"
         assert data["status"] == "active"
 
     def test_session_from_dict(self):

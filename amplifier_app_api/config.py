@@ -22,10 +22,42 @@ class Settings(BaseSettings):
     service_workers: int = Field(default=4, description="Number of worker processes")
     log_level: str = Field(default="info", description="Logging level")
 
-    # Database
-    database_url: str = Field(
-        default="sqlite+aiosqlite:///./amplifier.db",
-        description="Database connection URL",
+    # Database - PostgreSQL connection
+    database_url: str | None = Field(
+        default=None,
+        description="Full database connection URL (overrides individual fields)",
+    )
+    database_user: str = Field(
+        default="amplifier_dev",
+        description="Database username",
+    )
+    database_password: str = Field(
+        default="dev_password",
+        description="Database password",
+    )
+    database_host: str = Field(
+        default="localhost",
+        description="Database host",
+    )
+    database_port: int = Field(
+        default=5432,
+        description="Database port",
+    )
+    database_name: str = Field(
+        default="amplifier_dev",
+        description="Database name",
+    )
+    database_pool_min_size: int = Field(
+        default=10,
+        description="Minimum database connection pool size",
+    )
+    database_pool_max_size: int = Field(
+        default=20,
+        description="Maximum database connection pool size",
+    )
+    database_ssl_mode: str = Field(
+        default="prefer",
+        description="SSL mode: disable, prefer, require",
     )
 
     # Security
@@ -96,6 +128,34 @@ class Settings(BaseSettings):
     )
     jwt_issuer: str | None = Field(default=None, description="Expected JWT issuer (iss claim)")
     jwt_audience: str | None = Field(default=None, description="Expected JWT audience (aud claim)")
+
+    def get_database_url(self) -> str:
+        """
+        Get PostgreSQL connection URL.
+
+        If database_url is set, use it directly.
+        Otherwise, construct from individual components.
+        """
+        from urllib.parse import quote_plus
+
+        if self.database_url:
+            return self.database_url
+
+        # URL-encode username and password to handle special characters
+        user = quote_plus(self.database_user)
+        password = quote_plus(self.database_password)
+
+        # Construct PostgreSQL URL from components
+        ssl_param = ""
+        if self.database_ssl_mode == "require":
+            ssl_param = "?sslmode=require"
+        elif self.database_ssl_mode == "prefer":
+            ssl_param = "?sslmode=prefer"
+
+        return (
+            f"postgresql://{user}:{password}"
+            f"@{self.database_host}:{self.database_port}/{self.database_name}{ssl_param}"
+        )
 
     def get_api_keys(self) -> dict[str, str]:
         """Get all configured API keys."""

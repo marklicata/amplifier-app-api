@@ -54,6 +54,9 @@ class SessionManager:
             # Create a BundleRegistry for loading bundles
             self.registry = BundleRegistry()
 
+            # Mark that we need to populate registry on first use
+            self._registry_populated = False
+
             logger.info(
                 "Successfully imported amplifier-core and amplifier-foundation from installed packages"
             )
@@ -63,6 +66,99 @@ class SessionManager:
                 "Could not import amplifier-core or amplifier-foundation. "
                 "Ensure they are installed via 'uv sync'."
             ) from e
+
+    async def load_bundle(self, bundle_name: str) -> Any:
+        """Load a bundle by name using the BundleRegistry.
+
+        This method is used by ToolManager to load bundles for tool inspection/invocation.
+
+        Args:
+            bundle_name: Name of the bundle to load
+
+        Returns:
+            Found Bundle object
+
+        Raises:
+            ValueError: If bundle cannot be found
+        """
+        try:
+            # Use BundleRegistry to find the bundle
+            bundle = await self.registry.find(bundle_name)
+            logger.info(f"Found bundle: {bundle_name}")
+            return bundle
+        except Exception as e:
+            logger.error(f"Failed to find bundle {bundle_name}: {e}")
+            raise ValueError(f"Could not find bundle '{bundle_name}': {e}") from e
+
+    async def _populate_registry(self) -> None:
+        """Populate the BundleRegistry with bundles from the database.
+
+        This loads the bundle registry once per SessionManager instance,
+        allowing bundles to be resolved by name.
+        """
+        if self._registry_populated:
+            return
+
+        try:
+            # Get bundles from database
+            bundles = await self.config_manager.list_bundles()
+            logger.info(f"Populating registry with {len(bundles)} bundles from database")
+
+            # Convert to dict[str, str] format expected by registry.register()
+            bundle_sources = {
+                name: info["source"] for name, info in bundles.items() if info.get("source")
+            }
+
+            # Register all bundles at once
+            self.registry.register(bundle_sources)
+            logger.info(f"Registered {len(bundle_sources)} bundles with registry")
+
+            # Store bundle sources for use in source_resolver
+            self._bundle_sources = bundle_sources
+
+            self._registry_populated = True
+            logger.info("Bundle registry populated successfully")
+        except Exception as e:
+            logger.error(f"Failed to populate bundle registry: {e}", exc_info=True)
+            raise RuntimeError(f"Could not populate bundle registry: {e}") from e
+
+    async def _ensure_registry_populated(self) -> None:
+        """Ensure the bundle registry is populated.
+
+        This is needed so that config bundles can resolve their includes
+        like 'bundle: foundation' through the registry.
+        """
+        await self._populate_registry()
+
+    async def _ensure_foundation_loaded(self) -> None:
+        """Ensure foundation bundle is loaded and prepared globally.
+
+        This loads foundation once per SessionManager, making its core modules
+        (loop-basic, context-simple, etc.) globally available for all configs.
+        """
+        if hasattr(self, "_foundation_loaded"):
+            return
+
+        try:
+            await self._ensure_registry_populated()
+
+            logger.info("Loading foundation bundle to activate core modules...")
+
+            if not hasattr(self, "_bundle_sources") or "foundation" not in self._bundle_sources:
+                raise ValueError("Foundation bundle not found in registry")
+
+            foundation_source = self._bundle_sources["foundation"]
+
+            # Load and prepare foundation bundle to make modules globally available
+            foundation_bundle = await self.registry.load(foundation_source)
+            await foundation_bundle.prepare(install_deps=False)
+
+            self._foundation_loaded = True
+            logger.info("Foundation bundle loaded - core modules now globally available")
+
+        except Exception as e:
+            logger.error(f"Failed to load foundation bundle: {e}", exc_info=True)
+            raise RuntimeError(f"Could not load foundation bundle: {e}") from e
 
     async def _get_or_prepare_config_bundle(self, config_id: str) -> Any:
         """Get or prepare a bundle from a config YAML.
@@ -77,6 +173,10 @@ class SessionManager:
             ValueError: If config not found or YAML is invalid
             RuntimeError: If bundle preparation fails
         """
+
+        # Ensure registry is populated so the config bundle can resolve its includes (like 'bundle: foundation')
+        await self._ensure_registry_populated()
+
         if config_id in self._prepared_bundles:
             logger.info(f"Using cached bundle for config: {config_id}")
             return self._prepared_bundles[config_id]
@@ -114,9 +214,31 @@ class SessionManager:
 
             logger.info(f"Created Bundle from config dict: {config_id}")
 
+            # Create source resolver that uses our registry for resolving includes
+            def resolve_source(module_id: str, source: str) -> str:
+                """Resolve module sources using our registry.
+
+                This allows the bundle to resolve 'bundle: foundation' includes
+                by looking them up in our registry.
+                """
+                # If source looks like a bundle name (no URI scheme), try registry
+                if not source.startswith(("git+", "http://", "https://", "file://")):
+                    # Check if it's a registered bundle
+                    registry_uri = self.registry.find(source)
+                    if registry_uri:
+                        logger.info(f"Resolved bundle '{source}' to {registry_uri} via registry")
+                        return registry_uri
+
+                # Return original source if not found in registry
+                return source
+
             # Prepare bundle (resolves includes, loads modules, creates mount plan)
+            # install_deps=False because dependencies are already installed in Docker image
+            # Pass source_resolver so bundle can resolve 'bundle: foundation' includes
             logger.info(f"Preparing bundle for config: {config_id}")
-            prepared = await asyncio.wait_for(bundle.prepare(install_deps=True), timeout=60.0)
+            prepared = await asyncio.wait_for(
+                bundle.prepare(install_deps=False, source_resolver=resolve_source), timeout=60.0
+            )
             logger.info(f"Bundle prepared for config: {config_id}")
 
             # Cache prepared bundle for reuse
@@ -138,11 +260,15 @@ class SessionManager:
     async def create_session(
         self,
         config_id: str,
+        user_id: str | None = None,
+        app_id: str | None = None,
     ) -> Session:
         """Create a new Amplifier session from a config.
 
         Args:
             config_id: Config identifier to use for this session
+            user_id: Optional user identifier (from JWT 'sub' claim)
+            app_id: Optional application identifier (from API key)
 
         Returns:
             Session: The created session
@@ -177,11 +303,13 @@ class SessionManager:
         self._sessions[session_id] = amplifier_session
         logger.info(f"Created AmplifierSession: {session_id}")
 
-        # Store in database
+        # Store in database with user_id and app_id
         await self.db.create_session(
             session_id=session_id,
             config_id=config_id,
+            owner_user_id=user_id,
             status=SessionStatus.ACTIVE.value,
+            created_by_app_id=app_id,
         )
 
         # Create session object
@@ -192,7 +320,9 @@ class SessionManager:
             metadata=session_metadata,
         )
 
-        logger.info(f"Created session: {session_id} from config: {config_id}")
+        logger.info(
+            f"Created session: {session_id} from config: {config_id} (user: {user_id}, app: {app_id})"
+        )
         return session
 
     async def get_session(self, session_id: str) -> Session | None:
@@ -407,8 +537,34 @@ class SessionManager:
         events_queue: list[dict[str, Any]] = []
 
         def capture_event(event_type: str, data: dict[str, Any]) -> None:
-            """Capture events for streaming."""
-            events_queue.append({"type": event_type, "data": data})
+            """Capture events for streaming.
+
+            Ensures data is JSON-serializable by converting complex objects to dicts.
+            """
+            # Make a copy to avoid modifying the original
+            safe_data = {}
+            for key, value in data.items():
+                if isinstance(value, (str, int, float, bool, type(None))):
+                    safe_data[key] = value
+                elif isinstance(value, (list, dict)):
+                    # Lists and dicts need recursive handling, but for now just convert to string if needed
+                    try:
+                        import json
+
+                        json.dumps(value)  # Test if it's JSON-safe
+                        safe_data[key] = value
+                    except (TypeError, ValueError):
+                        safe_data[key] = str(value)
+                else:
+                    # Convert complex objects (like Usage, etc.) to dict or string
+                    if hasattr(value, "__dict__"):
+                        safe_data[key] = {
+                            k: v for k, v in value.__dict__.items() if not k.startswith("_")
+                        }
+                    else:
+                        safe_data[key] = str(value)
+
+            events_queue.append({"type": event_type, "data": safe_data})
 
         # Register temporary hook to capture events
         hooks = amplifier_session.coordinator.hooks
@@ -470,6 +626,7 @@ class SessionManager:
             raise
 
         finally:
-            # Cleanup event handlers
-            for event_type, handler in cleanup_handlers:
-                hooks.off(event_type, handler)
+            # Note: HookRegistry doesn't have an 'off' method for cleanup
+            # Handlers will be garbage collected when the session ends
+            # If needed, we could track handlers and clear them manually
+            pass

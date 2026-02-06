@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from ..core import SessionManager
@@ -76,12 +76,22 @@ Returns a unique session_id that can be used to:
 """,
 )
 async def create_session(
-    request: SessionCreateRequest,
+    session_request: SessionCreateRequest,
+    request: Request,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionResponse:
     """Create a new session from a config."""
     try:
-        session = await manager.create_session(config_id=request.config_id)
+        # Extract user_id and app_id from request.state (set by auth middleware)
+        # These will be None if authentication is not enabled
+        user_id = getattr(request.state, "user_id", None)
+        app_id = getattr(request.state, "app_id", None)
+
+        session = await manager.create_session(
+            config_id=session_request.config_id,
+            user_id=user_id,
+            app_id=app_id,
+        )
 
         return SessionResponse(
             session_id=session.session_id,
@@ -90,9 +100,21 @@ async def create_session(
             message="Session created successfully",
         )
     except ValueError as e:
-        # Config not found
-        logger.info(f"Config not found for session creation: {e}")
-        raise HTTPException(status_code=404, detail=f"Config not found: {request.config_id}")
+        # Config not found or validation error
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            logger.info(f"Config not found for session creation: {e}")
+            raise HTTPException(
+                status_code=404, detail=f"Config not found: {session_request.config_id}"
+            )
+        else:
+            # Config validation error
+            logger.warning(f"Config validation failed: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid config: {error_msg}")
+    except RuntimeError as e:
+        # Bundle preparation failed
+        logger.error(f"Bundle preparation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating session: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

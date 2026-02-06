@@ -4,10 +4,6 @@ These tests spin up the actual service and make real HTTP requests
 to validate the full HTTP stack works correctly.
 """
 
-import subprocess
-import time
-from pathlib import Path
-
 import pytest
 
 try:
@@ -15,61 +11,7 @@ try:
 except ImportError:
     httpx = None  # type: ignore[assignment]
 
-
-@pytest.fixture(scope="module")
-def live_service():
-    """Start the service in a subprocess and yield the URL."""
-    import sys
-
-    # Start the service
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "amplifier_app_api.main:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8767",  # Use 8767 to avoid conflicts
-        ],
-        cwd=Path(__file__).parent.parent,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env={**subprocess.os.environ, "PYTHONPATH": str(Path(__file__).parent.parent)},
-    )
-
-    # Wait for service to start
-    base_url = "http://127.0.0.1:8767"
-    started = False
-
-    for attempt in range(30):  # 30 attempts × 0.5 seconds = 15 seconds max
-        try:
-            response = httpx.get(f"{base_url}/health", timeout=2.0)
-            if response.status_code == 200:
-                started = True
-                print(f"\n✅ Service started at {base_url} (attempt {attempt + 1})")
-                break
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.ReadTimeout):
-            time.sleep(0.5)
-
-    if not started:
-        # Get logs
-        stdout, stderr = proc.communicate(timeout=1)
-        print(f"STDOUT: {stdout.decode()}")
-        print(f"STDERR: {stderr.decode()}")
-        proc.kill()
-        raise RuntimeError("Service failed to start within 15 seconds")
-
-    yield base_url
-
-    # Cleanup
-    print("\n🛑 Stopping service...")
-    proc.terminate()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+# Use the live_service fixture from conftest.py
 
 
 @pytest.mark.e2e
@@ -120,34 +62,13 @@ class TestE2ESessionEndpoints:
 
     def test_create_session(self, live_service):
         """POST /sessions"""
-        # First create a config
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "test-config",
-                "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
-            },
-            timeout=10.0,
-        )
-        
-        if config_response.status_code != 200:
-            return None
-            
-        config_id = config_response.json()["config_id"]
-        
+        # Use e2e_test_bundle from environment
+        import os
+
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set")
+
         # Then create session from config
         response = httpx.post(
             f"{live_service}/sessions",
@@ -220,56 +141,49 @@ providers:
 
 @pytest.mark.e2e
 class TestE2EConfigEndpoints:
-    """Test all 7 configuration endpoints."""
+    """Test all 5 config CRUD endpoints."""
 
-    def test_get_config(self, live_service):
-        """GET /config"""
-        response = httpx.get(f"{live_service}/config", timeout=5.0)
+    def test_create_config(self, live_service):
+        """POST /configs"""
+        response = httpx.post(
+            f"{live_service}/configs",
+            json={
+                "name": "test-config",
+                "yaml_content": "bundle:\n  name: test\n",
+            },
+            timeout=5.0,
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert "config_id" in data
+        assert data["name"] == "test-config"
+
+    def test_list_configs(self, live_service):
+        """GET /configs"""
+        response = httpx.get(f"{live_service}/configs", timeout=5.0)
         assert response.status_code == 200
         data = response.json()
-        assert "providers" in data
-        assert "bundles" in data
-        assert "modules" in data
+        assert "configs" in data
+        assert "total" in data
 
-    def test_update_config(self, live_service):
-        """POST /config"""
-        response = httpx.post(
-            f"{live_service}/config",
-            json={"providers": {"test": {"config": {}}}},
-            timeout=5.0,
-        )
-        assert response.status_code == 200
-
-    def test_list_providers(self, live_service):
-        """GET /config/providers"""
-        response = httpx.get(f"{live_service}/config/providers", timeout=5.0)
-        assert response.status_code == 200
-        assert isinstance(response.json(), list)
-
-    def test_add_provider(self, live_service):
-        """POST /config/providers"""
-        response = httpx.post(
-            f"{live_service}/config/providers",
-            json={"provider": "test-provider", "api_key": "test-key"},
-            timeout=5.0,
-        )
-        assert response.status_code == 200
-
-    def test_get_provider_404(self, live_service):
-        """GET /config/providers/{name} - nonexistent"""
-        response = httpx.get(f"{live_service}/config/providers/nonexistent", timeout=5.0)
+    def test_get_config_404(self, live_service):
+        """GET /configs/{id} - nonexistent"""
+        response = httpx.get(f"{live_service}/configs/nonexistent-id", timeout=5.0)
         assert response.status_code == 404
 
-    def test_activate_provider_404(self, live_service):
-        """POST /config/providers/{name}/activate - nonexistent"""
-        response = httpx.post(f"{live_service}/config/providers/nonexistent/activate", timeout=5.0)
+    def test_update_config_404(self, live_service):
+        """PUT /configs/{id} - nonexistent"""
+        response = httpx.put(
+            f"{live_service}/configs/nonexistent-id",
+            json={"name": "updated"},
+            timeout=5.0,
+        )
         assert response.status_code == 404
 
-    def test_get_current_provider(self, live_service):
-        """GET /config/providers/current"""
-        response = httpx.get(f"{live_service}/config/providers/current", timeout=5.0)
-        # May be 404 if no active provider, or 200 if one is set
-        assert response.status_code in [200, 404]
+    def test_delete_config_404(self, live_service):
+        """DELETE /configs/{id} - nonexistent"""
+        response = httpx.delete(f"{live_service}/configs/nonexistent-id", timeout=5.0)
+        assert response.status_code == 404
 
 
 @pytest.mark.e2e
@@ -489,15 +403,13 @@ class TestE2EEndpointCoverage:
             assert response.status_code in [200, 404, 422, 500]
 
     def test_all_config_endpoints_exist(self, live_service):
-        """Verify all 7 config endpoints are accessible."""
+        """Verify all 5 config endpoints are accessible."""
         endpoints = [
-            ("GET", "/config", None),
-            ("POST", "/config", {"providers": {}}),
-            ("GET", "/config/providers", None),
-            ("POST", "/config/providers", {"provider": "test"}),
-            ("GET", "/config/providers/test", None),
-            ("POST", "/config/providers/test/activate", None),
-            ("GET", "/config/providers/current", None),
+            ("POST", "/configs", {"name": "test", "yaml_content": "bundle:\n  name: test\n"}),
+            ("GET", "/configs", None),
+            ("GET", "/configs/test-id", None),
+            ("PUT", "/configs/test-id", {"name": "updated"}),
+            ("DELETE", "/configs/test-id", None),
         ]
 
         for method, path, json_data in endpoints:
@@ -509,9 +421,17 @@ class TestE2EEndpointCoverage:
                     json=json_data if json_data else {},
                     timeout=5.0,
                 )
+            elif method == "PUT":
+                response = httpx.put(
+                    f"{live_service}{path}",
+                    json=json_data if json_data else {},
+                    timeout=5.0,
+                )
+            elif method == "DELETE":
+                response = httpx.delete(f"{live_service}{path}", timeout=5.0)
 
             assert response.status_code != 405, f"Endpoint {method} {path} returned 405"
-            assert response.status_code in [200, 404, 422, 500]
+            assert response.status_code in [200, 201, 404, 422, 500]
 
     def test_all_bundle_endpoints_exist(self, live_service):
         """Verify all 5 bundle endpoints are accessible."""

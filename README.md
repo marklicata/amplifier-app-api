@@ -12,11 +12,11 @@ This service is based on [amplifier-app-cli](https://github.com/microsoft/amplif
 - 📊 Application Insights telemetry
 - 📦 Bundle and provider management
 - 🛠️ Tool invocation endpoints
-- 📝 Configuration management
-- 💾 SQLite-based persistence
+- 📝 Configuration management with CRUD + helper endpoints
+- 💾 PostgreSQL persistence (Azure PostgreSQL)
 - 🔄 Server-Sent Events (SSE) for streaming
 - 🐳 Docker deployment ready
-- 🧪 67+ tests with full endpoint coverage
+- 🧪 400+ tests with full endpoint coverage
 
 ## Quick Start
 
@@ -65,11 +65,11 @@ amplifier-app-api/
 │   │   ├── application.py  # Application models
 │   │   ├── user.py         # User models
 │   │   └── session.py      # Session models
-│   ├── storage/          # Database layer (SQLite)
+│   ├── storage/          # Database layer (PostgreSQL)
 │   ├── telemetry/        # Application Insights telemetry
 │   ├── config.py         # Application settings
 │   └── main.py           # FastAPI application
-├── tests/                # 67+ test cases
+├── tests/                # 400+ test cases
 │   ├── test_applications.py  # Auth tests
 │   ├── test_auth_middleware.py
 │   └── test_auth_integration.py
@@ -89,18 +89,15 @@ amplifier-app-api/
 
 ## API Endpoints
 
-### Configuration (8 endpoints)
+### Configuration (5 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/configs` | Create a new config (YAML bundle) |
 | GET | `/configs` | List all configs |
 | GET | `/configs/{id}` | Get config details |
-| PUT | `/configs/{id}` | Update config |
+| PUT | `/configs/{id}` | Update config (modify YAML directly) |
 | DELETE | `/configs/{id}` | Delete a config |
-| POST | `/configs/{id}/tools` | Add tool to config |
-| POST | `/configs/{id}/providers` | Add provider to config |
-| POST | `/configs/{id}/bundles` | Merge bundle into config |
 
 ### Session Management (8 endpoints)
 
@@ -125,23 +122,34 @@ amplifier-app-api/
 | DELETE | `/applications/{id}` | Delete application |
 | POST | `/applications/{id}/regenerate-key` | Regenerate API key |
 
-### Bundles (5 endpoints)
+### Tool Registry (5 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/bundles` | List available bundles |
-| GET | `/bundles/{name}` | Get bundle information |
-| POST | `/bundles/validate` | Validate bundle YAML |
-| POST | `/bundles/load` | Load and prepare bundle |
-| GET | `/bundles/{name}/tools` | List tools in bundle |
-
-### Tools (3 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/tools` | List available tools |
-| GET | `/tools/{name}` | Get tool information |
+| POST | `/tools` | Register tool in global registry |
+| GET | `/tools?from_registry=true` | List tools from registry |
+| GET | `/tools/{name}?from_registry=true` | Get tool from registry |
+| DELETE | `/tools/{name}` | Remove tool from registry |
 | POST | `/tools/invoke` | Invoke a tool |
+
+### Provider Registry (4 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/providers` | Register provider in global registry |
+| GET | `/providers` | List all registered providers |
+| GET | `/providers/{name}` | Get provider from registry |
+| DELETE | `/providers/{name}` | Remove provider from registry |
+
+### Bundle Registry (5 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/bundles` | Register bundle in global registry |
+| GET | `/bundles` | List all registered bundles |
+| GET | `/bundles/{name}` | Get bundle from registry |
+| DELETE | `/bundles/{name}` | Remove bundle from registry |
+| POST | `/bundles/{name}/activate` | Set active bundle |
 
 ### Health & Testing (5 endpoints)
 
@@ -153,7 +161,7 @@ amplifier-app-api/
 | GET | `/smoke-tests/quick` | Run quick smoke tests |
 | GET | `/smoke-tests` | Run full test suite |
 
-**Total: 34 endpoints**
+**Total: 37 endpoints**
 
 ## Usage Examples
 
@@ -355,7 +363,7 @@ See [docs/SETUP.md](docs/SETUP.md) for production deployment guide.
 
 ## Testing
 
-The service includes a comprehensive test suite with 67+ test cases.
+The service includes a comprehensive test suite with 400+ test cases covering all endpoints and core business logic.
 
 ### Run Tests
 
@@ -381,10 +389,11 @@ curl http://localhost:8765/smoke-tests/quick
 ```
 
 **Test Coverage:**
-- ✅ Infrastructure (database, models): 41 tests
+- ✅ Core business logic: 110+ new comprehensive tests
+- ✅ Infrastructure (database, models): 60+ tests
 - ✅ Authentication (applications, middleware, integration): 26 tests
-- ✅ API endpoints: Smoke tests for all 34 endpoints
-- ✅ E2E flows: Config → Session → Message
+- ✅ API endpoints: All 37 endpoints fully tested
+- ✅ E2E flows: Config → Session → Message with real HTTP
 
 See [docs/TESTING.md](docs/TESTING.md) and [docs/TESTING_AUTHENTICATION.md](docs/TESTING_AUTHENTICATION.md) for complete guides.
 

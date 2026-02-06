@@ -56,10 +56,9 @@ async def get_version() -> VersionResponse:
     # TODO: Get actual versions from amplifier-core and amplifier-foundation
     return VersionResponse(
         service_version=__version__,
-        amplifier_core_version=None,
-        amplifier_foundation_version=None,
+        amplifier_core_version="976fb87335ffe398cf0c1bd1bcd3c2f2c154fc3c",
+        amplifier_foundation_version="412fcb51980523c77339c32ef1ba3bc80c13b680",
     )
-
 
 @router.get("/")
 async def root() -> dict[str, Any]:

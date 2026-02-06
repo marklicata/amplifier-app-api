@@ -8,6 +8,7 @@ Requirements:
 - amplifier-core and amplifier-foundation configured
 """
 
+import os
 import pytest
 
 try:
@@ -24,30 +25,10 @@ class TestSessionStreaming:
     def test_stream_message_returns_sse_events(self, live_service):
         """Test that streaming returns valid SSE events."""
         # Create config
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "stream-test-config",
-                "yaml_content": """
-bundle:
-  name: stream-test
-includes:
-  - bundle: foundation
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: claude-sonnet-4-5
-session:
-  orchestrator: loop-streaming
-  context: context-simple
-""",
-            },
-            timeout=10.0,
-        )
-
-        assert config_response.status_code == 201
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session
         session_response = httpx.post(
@@ -95,7 +76,6 @@ session:
 
         # Cleanup
         httpx.delete(f"{live_service}/sessions/{session_id}", timeout=5.0)
-        httpx.delete(f"{live_service}/configs/{config_id}", timeout=5.0)
 
     def test_stream_to_nonexistent_session_returns_404(self, live_service):
         """Test streaming to non-existent session returns 404."""
@@ -120,29 +100,10 @@ session:
     def test_stream_incremental_content(self, live_service):
         """Test that streaming returns incremental content, not all at once."""
         # Create config
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "incremental-stream-config",
-                "yaml_content": """
-bundle:
-  name: incremental-stream
-includes:
-  - bundle: foundation
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: claude-sonnet-4-5
-session:
-  orchestrator: loop-streaming
-  context: context-simple
-""",
-            },
-            timeout=10.0,
-        )
-
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session
         session_response = httpx.post(
@@ -188,34 +149,14 @@ session:
 
         # Cleanup
         httpx.delete(f"{live_service}/sessions/{session_id}", timeout=5.0)
-        httpx.delete(f"{live_service}/configs/{config_id}", timeout=5.0)
 
     def test_stream_error_handling(self, live_service):
         """Test error handling during streaming."""
         # Create config with invalid setup (will cause runtime error)
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "error-stream-config",
-                "yaml_content": """
-bundle:
-  name: error-stream
-includes:
-  - bundle: foundation
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: invalid-key-will-fail
-      model: claude-sonnet-4-5
-session:
-  orchestrator: loop-streaming
-  context: context-simple
-""",
-            },
-            timeout=10.0,
-        )
-
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session (might succeed despite bad key)
         session_response = httpx.post(
@@ -257,34 +198,14 @@ session:
             httpx.delete(f"{live_service}/sessions/{session_id}", timeout=5.0)
 
         # Cleanup config
-        httpx.delete(f"{live_service}/configs/{config_id}", timeout=5.0)
 
     def test_stream_with_context_parameter(self, live_service):
         """Test streaming with additional context."""
         # Create config
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "stream-context-config",
-                "yaml_content": """
-bundle:
-  name: stream-context
-includes:
-  - bundle: foundation
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: claude-sonnet-4-5
-session:
-  orchestrator: loop-streaming
-  context: context-simple
-""",
-            },
-            timeout=10.0,
-        )
-
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session
         session_response = httpx.post(
@@ -318,7 +239,6 @@ session:
 
         # Cleanup
         httpx.delete(f"{live_service}/sessions/{session_id}", timeout=5.0)
-        httpx.delete(f"{live_service}/configs/{config_id}", timeout=5.0)
 
 
 @pytest.mark.e2e
@@ -329,29 +249,10 @@ class TestStreamCancellation:
     def test_cancel_streaming_session(self, live_service):
         """Test cancelling a session while streaming is in progress."""
         # Create config
-        config_response = httpx.post(
-            f"{live_service}/configs",
-            json={
-                "name": "cancel-stream-config",
-                "yaml_content": """
-bundle:
-  name: cancel-stream
-includes:
-  - bundle: foundation
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: claude-sonnet-4-5
-session:
-  orchestrator: loop-streaming
-  context: context-simple
-""",
-            },
-            timeout=10.0,
-        )
-
-        config_id = config_response.json()["config_id"]
+        # Use e2e_test_bundle from environment
+        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
+        if not config_id:
+            pytest.skip("E2E_TEST_BUNDLE_ID not set in environment")
 
         # Create session
         session_response = httpx.post(
@@ -376,4 +277,3 @@ session:
 
         # Cleanup
         httpx.delete(f"{live_service}/sessions/{session_id}", timeout=5.0)
-        httpx.delete(f"{live_service}/configs/{config_id}", timeout=5.0)

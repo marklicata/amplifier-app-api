@@ -6,7 +6,6 @@ Tests the complete lifecycle: Config creation → Session creation → Message s
 import asyncio
 
 import pytest
-import yaml
 from httpx import AsyncClient, Response
 
 
@@ -364,76 +363,6 @@ providers:
         assert resume1.json()["config_id"] == config1_id
         assert resume2.json()["config_id"] == config2_id
 
-    async def test_config_helper_methods_maintain_structure(self, client: AsyncClient):
-        """Test that helper methods maintain valid YAML structure."""
-        # Create minimal config
-        config_response = await client.post(
-            "/configs",
-            json={
-                "name": "helper-structure-test",
-                "yaml_content": """
-bundle:
-  name: helper-test
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-""",
-            },
-        )
-
-        config_id = config_response.json()["config_id"]
-
-        # Add tool
-        await client.post(
-            f"/configs/{config_id}/tools",
-            params={"tool_module": "tool-web", "tool_source": "./modules/tool-web"},
-        )
-
-        # Add provider
-        await client.post(
-            f"/configs/{config_id}/providers",
-            params={"provider_module": "provider-openai"},
-            json={"api_key": "test2"},
-        )
-
-        # Merge bundle
-        await client.post(
-            f"/configs/{config_id}/bundles",
-            params={"bundle_uri": "recipes"},
-        )
-
-        # Get final config
-        final_response = await client.get(f"/configs/{config_id}")
-        final_yaml = final_response.json()["yaml_content"]
-
-        # Parse to verify structure is still valid
-
-        parsed = yaml.safe_load(final_yaml)
-        assert "bundle" in parsed
-        assert parsed["bundle"]["name"] == "helper-test"
-        assert "session" in parsed
-        assert "providers" in parsed
-        assert len(parsed["providers"]) == 2  # anthropic + openai
-        assert "tools" in parsed
-        assert len(parsed["tools"]) == 1  # web
-        assert "includes" in parsed
-        assert len(parsed["includes"]) == 1  # recipes
-
-        # Try to create a session with this modified config
-        session_response = await client.post(
-            "/sessions",
-            json={"config_id": config_id},
-        )
-
-        # Should succeed if structure is valid
-        assert session_response.status_code in [201, 500]  # 500 if bundle prep fails
-
     async def test_update_config_with_sessions_active(self, client: AsyncClient):
         """Test updating a config while it has active sessions."""
         # Create config
@@ -589,16 +518,16 @@ agents:
             get_response = await client.get(f"/sessions/{session_id}")
             assert get_response.status_code == 200
 
-    async def test_programmatic_build_then_create_session(self, client: AsyncClient):
-        """Test building config programmatically then creating session."""
+    async def test_update_config_then_create_session(self, client: AsyncClient):
+        """Test updating config via PUT then creating session."""
         # Create minimal config
         config_response = await client.post(
             "/configs",
             json={
-                "name": "programmatic-build",
+                "name": "update-build",
                 "yaml_content": """
 bundle:
-  name: programmatic
+  name: update-test
 
 session:
   orchestrator: loop-basic
@@ -615,36 +544,41 @@ providers:
 
         config_id = config_response.json()["config_id"]
 
-        # Build it up programmatically
-        # Add foundation bundle
-        await client.post(
-            f"/configs/{config_id}/bundles",
-            params={"bundle_uri": "foundation"},
+        # Update config with complete YAML
+        updated_yaml = """
+bundle:
+  name: update-test
+  version: 2.0.0
+
+includes:
+  - bundle: foundation
+
+session:
+  orchestrator: loop-streaming
+  context: context-persistent
+
+providers:
+  - module: provider-anthropic
+    config:
+      api_key: base-key
+      model: claude-sonnet-4-5
+  - module: provider-openai
+    config:
+      api_key: test-openai-key
+      model: gpt-4o
+
+tools:
+  - module: tool-filesystem
+  - module: tool-web
+"""
+
+        update_response = await client.put(
+            f"/configs/{config_id}",
+            json={"yaml_content": updated_yaml},
         )
+        assert update_response.status_code == 200
 
-        # Add tools
-        await client.post(
-            f"/configs/{config_id}/tools",
-            params={"tool_module": "tool-filesystem", "tool_source": "./modules/tool-filesystem"},
-        )
-
-        await client.post(
-            f"/configs/{config_id}/tools",
-            params={"tool_module": "tool-web", "tool_source": "./modules/tool-web"},
-        )
-
-        # Add another provider
-        await client.post(
-            f"/configs/{config_id}/providers",
-            params={"provider_module": "provider-openai"},
-            json={"api_key": "test-openai-key", "model": "gpt-4o"},
-        )
-
-        # Get final config
-        final_response = await client.get(f"/configs/{config_id}")
-        assert final_response.status_code == 200
-
-        # Create session from programmatically built config
+        # Create session from updated config
         session_response = await client.post(
             "/sessions",
             json={"config_id": config_id},

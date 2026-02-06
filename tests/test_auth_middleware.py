@@ -46,13 +46,17 @@ async def test_missing_api_key_when_auth_enabled(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_missing_jwt_when_auth_enabled(client: AsyncClient):
     """Test that missing JWT is rejected when auth is enabled."""
+    import uuid
+
     from amplifier_app_api.config import settings
 
     # First create an application to get a valid API key
+    app_id = f"test-app-{uuid.uuid4().hex[:8]}"
     app_response = await client.post(
         "/applications",
-        json={"app_id": "test-app", "app_name": "Test App"},
+        json={"app_id": app_id, "app_name": "Test App"},
     )
+    assert app_response.status_code == 201
     api_key = app_response.json()["api_key"]
 
     with patch.object(settings, "auth_required", True):
@@ -92,13 +96,17 @@ async def test_invalid_api_key_rejected(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_valid_api_key_and_jwt_accepted(client: AsyncClient):
     """Test that valid API key + JWT is accepted."""
+    import uuid
+
     from amplifier_app_api.config import settings
 
     # Create application
+    app_id = f"valid-app-{uuid.uuid4().hex[:8]}"
     app_response = await client.post(
         "/applications",
-        json={"app_id": "valid-app", "app_name": "Valid App"},
+        json={"app_id": app_id, "app_name": "Valid App"},
     )
+    assert app_response.status_code == 201
     api_key = app_response.json()["api_key"]
 
     # Create valid JWT
@@ -123,13 +131,17 @@ async def test_valid_api_key_and_jwt_accepted(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_expired_jwt_rejected(client: AsyncClient):
     """Test that expired JWT is rejected."""
+    import uuid
+
     from amplifier_app_api.config import settings
 
     # Create application
+    app_id = f"exp-test-{uuid.uuid4().hex[:8]}"
     app_response = await client.post(
         "/applications",
-        json={"app_id": "exp-test", "app_name": "Exp Test"},
+        json={"app_id": app_id, "app_name": "Exp Test"},
     )
+    assert app_response.status_code == 201
     api_key = app_response.json()["api_key"]
 
     # Create expired JWT (exp in the past)
@@ -154,13 +166,17 @@ async def test_expired_jwt_rejected(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_jwt_missing_sub_claim_rejected(client: AsyncClient):
     """Test that JWT without 'sub' claim is rejected."""
+    import uuid
+
     from amplifier_app_api.config import settings
 
     # Create application
+    app_id = f"sub-test-{uuid.uuid4().hex[:8]}"
     app_response = await client.post(
         "/applications",
-        json={"app_id": "sub-test", "app_name": "Sub Test"},
+        json={"app_id": app_id, "app_name": "Sub Test"},
     )
+    assert app_response.status_code == 201
     api_key = app_response.json()["api_key"]
 
     # Create JWT without 'sub' claim
@@ -185,13 +201,17 @@ async def test_jwt_missing_sub_claim_rejected(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_malformed_jwt_rejected(client: AsyncClient):
     """Test that malformed JWT is rejected."""
+    import uuid
+
     from amplifier_app_api.config import settings
 
     # Create application
+    app_id = f"malformed-test-{uuid.uuid4().hex[:8]}"
     app_response = await client.post(
         "/applications",
-        json={"app_id": "malformed-test", "app_name": "Malformed Test"},
+        json={"app_id": app_id, "app_name": "Malformed Test"},
     )
+    assert app_response.status_code == 201
     api_key = app_response.json()["api_key"]
 
     with patch.object(settings, "auth_required", True):

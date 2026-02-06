@@ -63,8 +63,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 app_id, user_id = await self._verify_jwt_with_app_claim(request)
             else:
                 return JSONResponse(
-                    status_code=500,
-                    content={"detail": f"Invalid auth mode: {settings.auth_mode}"}
+                    status_code=500, content={"detail": f"Invalid auth mode: {settings.auth_mode}"}
                 )
 
             # Set authenticated context
@@ -76,16 +75,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         except HTTPException as e:
             # Convert HTTPException to JSONResponse
-            return JSONResponse(
-                status_code=e.status_code,
-                content={"detail": e.detail}
-            )
+            return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
         except Exception as e:
             logger.error(f"Authentication error: {e}", exc_info=True)
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Authentication failed"}
-            )
+            return JSONResponse(status_code=401, content={"detail": "Authentication failed"})
 
     async def _verify_api_key(self, request: Request) -> str:
         """Verify API key and return app_id.
@@ -113,13 +106,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
             raise HTTPException(status_code=503, detail="Database not available")
 
         # Look up application by API key
-        if not db._connection:
+        if not db._pool:
             raise HTTPException(status_code=503, detail="Database not available")
 
-        cursor = await db._connection.execute(
-            "SELECT app_id, api_key_hash, is_active FROM applications"
-        )
-        applications = await cursor.fetchall()
+        async with db._pool.acquire() as conn:
+            applications = await conn.fetch(
+                "SELECT app_id, api_key_hash, is_active FROM applications"
+            )
 
         for app in applications:
             # Verify the API key against stored hash

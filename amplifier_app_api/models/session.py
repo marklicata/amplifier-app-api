@@ -38,9 +38,11 @@ class Session(BaseModel):
 
     session_id: str
     config_id: str  # References a Config
-    user_id: str = Field(..., description="User who owns this session (from JWT 'sub')")
-    created_by_app_id: str = Field(
-        ..., description="Application that created this session (for tracking)"
+    user_id: str | None = Field(
+        default=None, description="User who owns this session (from JWT 'sub')"
+    )
+    created_by_app_id: str | None = Field(
+        default=None, description="Application that created this session (for tracking)"
     )
     last_accessed_by_app_id: str | None = Field(
         default=None, description="Application that last accessed this session"
