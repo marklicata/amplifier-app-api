@@ -473,5 +473,3 @@ MIT License (same as amplifier-app-cli)
 - [amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli) - CLI reference implementation
 
 ---
-
-**Built with ❤️ using Amplifier**
