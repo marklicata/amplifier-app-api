@@ -187,7 +187,22 @@ jobs:
               --scale-rule-metadata type=Utilization value=70 \
               --scale-rule-name http-scale \
               --scale-rule-type http \
-              --scale-rule-http-concurrency 50
+              --scale-rule-http-concurrency 50 \
+              --set-env-vars \
+                "DATABASE_HOST=amplifier-api-db-prod.postgres.database.azure.com" \
+                "DATABASE_USER=amplifierdbprod" \
+                "DATABASE_NAME=postgres" \
+                "DATABASE_PORT=5432" \
+                "DATABASE_SSL_MODE=require" \
+                "DATABASE_POOL_MIN_SIZE=10" \
+                "DATABASE_POOL_MAX_SIZE=20" \
+                "DATABASE_PASSWORD=secretref:dbpassword" \
+                "TELEMETRY_APP_INSIGHTS_CONNECTION_STRING=${{ secrets.TELEMETRY_APP_INSIGHTS_CONNECTION_STRING }}" \
+                "TELEMETRY_ENVIRONMENT=production" \
+                "TELEMETRY_SAMPLE_RATE=0.1" \
+                "TELEMETRY_ENABLE_DEV_LOGGER=false" \
+                "LOG_LEVEL=info" \
+                "AUTH_REQUIRED=false"
 
             # Force deactivate old revisions to ensure all traffic goes to new revision
             echo "Deactivating old revisions to force full rollout..."
