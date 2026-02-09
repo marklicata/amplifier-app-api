@@ -16,6 +16,9 @@ services:
       DATABASE_HOST: amplifier-api-db-prod.postgres.database.azure.com
       DATABASE_USER: amplifierdbprod
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-}
+      DATABASE_PORT: 5432
+      DATABASE_NAME: postgres
+      DATABASE_SSL_MODE: require
 
       # Telemetry - Production settings
       TELEMETRY_ENVIRONMENT: production
