@@ -18,8 +18,11 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY amplifier_app_api ./amplifier_app_api
 
-# Install dependencies
-RUN uv pip install --system -e .
+# Clean uv cache to ensure fresh git clones of dependencies
+RUN uv cache clean
+
+# Install dependencies (use regular install, not editable, for production)
+RUN uv pip install --system .
 
 # Production stage
 FROM python:3.11-slim
