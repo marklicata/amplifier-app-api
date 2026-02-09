@@ -167,36 +167,54 @@ jobs:
           inlineScript: |
             # Explicitely set subscription
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-            
-            # Update container app with new image and scaling rules
+
+            # Create unique revision suffix from commit SHA
+            REVISION_SUFFIX=$(echo ${{ github.sha }} | cut -c1-8)
+
+            # Update container app with new image and ALL scaling rules in ONE command
+            # This ensures a single revision is created and properly deployed
             az containerapp update \
               --name ${{ secrets.CONTAINER_APP_NAME }} \
               --resource-group ${{ secrets.RESOURCE_GROUP }} \
               --image ${{ secrets.ACR_REGISTRY }}/amplifier-app-api:${{ github.sha }} \
+              --revision-suffix "$REVISION_SUFFIX" \
               --min-replicas 3 \
               --max-replicas 10 \
               --cpu 4 \
-              --memory 8Gi
-            
-            # Configure CPU-based auto-scaling
-            az containerapp update \
-              --name ${{ secrets.CONTAINER_APP_NAME }} \
-              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --memory 8Gi \
               --scale-rule-name cpu-scale \
               --scale-rule-type cpu \
-              --scale-rule-metadata type=Utilization value=70
-            
-            # Configure HTTP-based auto-scaling (concurrent requests)
-            az containerapp update \
-              --name ${{ secrets.CONTAINER_APP_NAME }} \
-              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --scale-rule-metadata type=Utilization value=70 \
               --scale-rule-name http-scale \
               --scale-rule-type http \
               --scale-rule-http-concurrency 50
-            
+
+            # Force deactivate old revisions to ensure all traffic goes to new revision
+            echo "Deactivating old revisions to force full rollout..."
+            az containerapp revision list \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --query "[?name!='${{ secrets.CONTAINER_APP_NAME }}--$REVISION_SUFFIX'].name" \
+              --output tsv | while read OLD_REVISION; do
+                if [ -n "$OLD_REVISION" ]; then
+                  echo "Deactivating $OLD_REVISION"
+                  az containerapp revision deactivate \
+                    --name ${{ secrets.CONTAINER_APP_NAME }} \
+                    --resource-group ${{ secrets.RESOURCE_GROUP }} \
+                    --revision "$OLD_REVISION" || echo "Failed to deactivate $OLD_REVISION"
+                fi
+              done
+
+            # Get app URL
+            APP_URL=$(az containerapp show \
+              --name ${{ secrets.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --query properties.configuration.ingress.fqdn \
+              --output tsv)
+
             echo "Deployment completed successfully!"
-            
             echo "App URL: https://$APP_URL"
+            echo "Revision: ${{ secrets.CONTAINER_APP_NAME }}--$REVISION_SUFFIX"
             echo "Scaling: 3-10 replicas based on CPU (70%) and concurrent requests (50)"
             echo "app-url=https://$APP_URL" >> $GITHUB_OUTPUT
 
@@ -213,8 +231,8 @@ jobs:
     steps:
       - name: Wait for deployment to stabilize
         run: |
-          echo "Waiting 30 seconds for deployment to stabilize..."
-          sleep 30
+          echo "Waiting 60 seconds for deployment to stabilize and all replicas to restart..."
+          sleep 60
 
       - name: Azure Login
         uses: azure/login@v1

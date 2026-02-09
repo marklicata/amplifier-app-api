@@ -2,6 +2,7 @@
 # Development startup script for Amplifier App api
 
 set -e
+cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 echo "🚀 Starting Amplifier App api Development Server"
 echo ""
