@@ -14,7 +14,7 @@ Write-Host ""
 
 # Step 1: Stop existing Docker image
 Write-Host "[Step 1/4] Stop existing Docker image..." -ForegroundColor Yellow
-docker stop amplifier-app-api
+docker-compose down 2>$null
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Docker failed to stop amplifier-app-api!" -ForegroundColor Red
