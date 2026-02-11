@@ -11,6 +11,12 @@ from amplifier_app_api.storage import get_db
 async def test_user_id(test_db):
     """Create a test user and return the user_id."""
     user_id = "test-recipe-user"
+
+    # Cleanup any existing data first
+    async with test_db._pool.acquire() as conn:
+        await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+        await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
+
     async with test_db._pool.acquire() as conn:
         await conn.execute(
             """
@@ -22,7 +28,7 @@ async def test_user_id(test_db):
         )
     yield user_id
 
-    # Cleanup
+    # Cleanup after test
     async with test_db._pool.acquire() as conn:
         await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
         await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
@@ -35,13 +41,14 @@ async def recipe_client(test_db, test_user_id):
 
     import amplifier_app_api.storage.database as db_module
     from amplifier_app_api.api.recipes import router as recipes_router
-    from amplifier_app_api.middleware.auth import get_current_user
+    # Auth handled by dependency injection
 
     test_app = FastAPI()
     test_app.include_router(recipes_router)
 
-    # Mock auth to return test user
-    test_app.dependency_overrides[get_current_user] = lambda: test_user_id
+    # Mock auth by injecting user_id via dependency
+    from amplifier_app_api.api.recipes import get_user_id
+    test_app.dependency_overrides[get_user_id] = lambda: test_user_id
     test_app.dependency_overrides[get_db] = lambda: test_db
 
     original_db = db_module._db
@@ -94,7 +101,7 @@ class TestRecipeAPICreate:
 
     async def test_create_recipe_success(self, recipe_client, sample_recipe):
         """Test successful recipe creation."""
-        response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        response = await recipe_client.post("/api/recipes/", json=sample_recipe)
 
         assert response.status_code == 201
         data = response.json()
@@ -118,20 +125,22 @@ class TestRecipeAPICreate:
             },
         }
 
-        response = await recipe_client.post("/api/recipes", json=invalid_recipe)
-        assert response.status_code == 400
-        assert "Recipe validation failed" in response.json()["detail"]
+        response = await recipe_client.post("/api/recipes/", json=invalid_recipe)
+        assert response.status_code == 422  # Pydantic validation error
+        # Check that error mentions missing fields
+        detail = response.json()["detail"]
+        assert any("Missing required fields" in str(d) for d in detail)
 
     async def test_create_recipe_missing_name(self, recipe_client, sample_recipe):
         """Test creating recipe without name."""
         del sample_recipe["name"]
-        response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         assert response.status_code == 422  # Pydantic validation error
 
     async def test_create_recipe_empty_name(self, recipe_client, sample_recipe):
         """Test creating recipe with empty name."""
         sample_recipe["name"] = ""
-        response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         assert response.status_code == 422
 
     async def test_create_recipe_invalid_depends_on(self, recipe_client):
@@ -159,9 +168,10 @@ class TestRecipeAPICreate:
             },
         }
 
-        response = await recipe_client.post("/api/recipes", json=recipe)
-        assert response.status_code == 400
-        assert "depends on 'nonexistent'" in response.json()["detail"]
+        response = await recipe_client.post("/api/recipes/", json=recipe)
+        assert response.status_code == 422  # Pydantic validation error
+        detail = response.json()["detail"]
+        assert any("depends on 'nonexistent'" in str(d) for d in detail)
 
 
 @pytest.mark.asyncio
@@ -170,7 +180,7 @@ class TestRecipeAPIList:
 
     async def test_list_recipes_empty(self, recipe_client):
         """Test listing recipes when none exist."""
-        response = await recipe_client.get("/api/recipes")
+        response = await recipe_client.get("/api/recipes/")
 
         assert response.status_code == 200
         data = response.json()
@@ -183,9 +193,9 @@ class TestRecipeAPIList:
         for i in range(3):
             recipe = sample_recipe.copy()
             recipe["name"] = f"recipe-{i}"
-            await recipe_client.post("/api/recipes", json=recipe)
+            await recipe_client.post("/api/recipes/", json=recipe)
 
-        response = await recipe_client.get("/api/recipes")
+        response = await recipe_client.get("/api/recipes/")
 
         assert response.status_code == 200
         data = response.json()
@@ -198,15 +208,15 @@ class TestRecipeAPIList:
         recipe1 = sample_recipe.copy()
         recipe1["name"] = "recipe-1"
         recipe1["tags"] = {"category": "deployment"}
-        await recipe_client.post("/api/recipes", json=recipe1)
+        await recipe_client.post("/api/recipes/", json=recipe1)
 
         recipe2 = sample_recipe.copy()
         recipe2["name"] = "recipe-2"
         recipe2["tags"] = {"category": "testing"}
-        await recipe_client.post("/api/recipes", json=recipe2)
+        await recipe_client.post("/api/recipes/", json=recipe2)
 
         # Filter by tag
-        response = await recipe_client.get("/api/recipes?tags=category:deployment")
+        response = await recipe_client.get("/api/recipes/?tags=category:deployment")
 
         assert response.status_code == 200
         data = response.json()
@@ -219,16 +229,16 @@ class TestRecipeAPIList:
         for i in range(10):
             recipe = sample_recipe.copy()
             recipe["name"] = f"recipe-{i:02d}"
-            await recipe_client.post("/api/recipes", json=recipe)
+            await recipe_client.post("/api/recipes/", json=recipe)
 
         # Get first page
-        response1 = await recipe_client.get("/api/recipes?limit=5&offset=0")
+        response1 = await recipe_client.get("/api/recipes/?limit=5&offset=0")
         assert response1.status_code == 200
         data1 = response1.json()
         assert len(data1["recipes"]) == 5
 
         # Get second page
-        response2 = await recipe_client.get("/api/recipes?limit=5&offset=5")
+        response2 = await recipe_client.get("/api/recipes/?limit=5&offset=5")
         assert response2.status_code == 200
         data2 = response2.json()
         assert len(data2["recipes"]) == 5
@@ -246,7 +256,7 @@ class TestRecipeAPIGet:
     async def test_get_recipe_success(self, recipe_client, sample_recipe):
         """Test getting existing recipe."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Get recipe
@@ -260,7 +270,7 @@ class TestRecipeAPIGet:
 
     async def test_get_recipe_not_found(self, recipe_client):
         """Test getting nonexistent recipe."""
-        response = await recipe_client.get("/api/recipes/nonexistent-id")
+        response = await recipe_client.get("/api/recipes/00000000-0000-0000-0000-000000000000")
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Recipe not found"
@@ -273,7 +283,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_name(self, recipe_client, sample_recipe):
         """Test updating recipe name."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Update name
@@ -289,7 +299,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_description(self, recipe_client, sample_recipe):
         """Test updating recipe description."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Update description
@@ -304,7 +314,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_tags(self, recipe_client, sample_recipe):
         """Test updating recipe tags."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Update tags
@@ -319,7 +329,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_version(self, recipe_client, sample_recipe):
         """Test updating recipe version."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Update version
@@ -334,7 +344,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_data(self, recipe_client, sample_recipe):
         """Test updating recipe data."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Update recipe_data
@@ -349,7 +359,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_not_found(self, recipe_client):
         """Test updating nonexistent recipe."""
         response = await recipe_client.put(
-            "/api/recipes/nonexistent-id", json={"name": "new-name"}
+            "/api/recipes/00000000-0000-0000-0000-000000000000", json={"name": "new-name"}
         )
 
         assert response.status_code == 404
@@ -358,7 +368,7 @@ class TestRecipeAPIUpdate:
     async def test_update_recipe_invalid_data(self, recipe_client, sample_recipe):
         """Test updating with invalid recipe data."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Try to update with invalid data
@@ -367,8 +377,9 @@ class TestRecipeAPIUpdate:
             f"/api/recipes/{recipe_id}", json={"recipe_data": invalid_data}
         )
 
-        assert response.status_code == 400
-        assert "Recipe validation failed" in response.json()["detail"]
+        assert response.status_code == 422  # Pydantic validation error
+        detail = response.json()["detail"]
+        assert any("Missing required fields" in str(d) for d in detail)
 
 
 @pytest.mark.asyncio
@@ -378,7 +389,7 @@ class TestRecipeAPIDelete:
     async def test_delete_recipe_success(self, recipe_client, sample_recipe):
         """Test successful recipe deletion."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Delete recipe
@@ -392,7 +403,7 @@ class TestRecipeAPIDelete:
 
     async def test_delete_recipe_not_found(self, recipe_client):
         """Test deleting nonexistent recipe."""
-        response = await recipe_client.delete("/api/recipes/nonexistent-id")
+        response = await recipe_client.delete("/api/recipes/00000000-0000-0000-0000-000000000000")
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Recipe not found"
@@ -405,7 +416,7 @@ class TestRecipeAPIEdgeCases:
     async def test_create_recipe_very_long_name(self, recipe_client, sample_recipe):
         """Test creating recipe with very long name."""
         sample_recipe["name"] = "x" * 300  # Longer than VARCHAR(255)
-        response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        response = await recipe_client.post("/api/recipes/", json=sample_recipe)
 
         # Should fail (database constraint or validation)
         assert response.status_code in [400, 422, 500]
@@ -413,14 +424,14 @@ class TestRecipeAPIEdgeCases:
     async def test_create_recipe_special_characters_in_name(self, recipe_client, sample_recipe):
         """Test creating recipe with special characters in name."""
         sample_recipe["name"] = "test-recipe-with-special-chars-!@#$%"
-        response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        response = await recipe_client.post("/api/recipes/", json=sample_recipe)
 
         # Should succeed - special chars allowed
         assert response.status_code == 201
 
     async def test_list_recipes_invalid_pagination(self, recipe_client):
         """Test listing with invalid pagination parameters."""
-        response = await recipe_client.get("/api/recipes?limit=-1")
+        response = await recipe_client.get("/api/recipes/?limit=-1")
 
         # Should handle gracefully (422 validation error)
         assert response.status_code == 422
@@ -428,7 +439,7 @@ class TestRecipeAPIEdgeCases:
     async def test_update_recipe_empty_payload(self, recipe_client, sample_recipe):
         """Test updating recipe with empty payload."""
         # Create recipe
-        create_response = await recipe_client.post("/api/recipes", json=sample_recipe)
+        create_response = await recipe_client.post("/api/recipes/", json=sample_recipe)
         recipe_id = create_response.json()["recipe_id"]
 
         # Update with empty payload (all fields optional)
@@ -443,8 +454,8 @@ class TestRecipeAPIEdgeCases:
 
         # Try to create two recipes with same name concurrently
         tasks = [
-            recipe_client.post("/api/recipes", json=sample_recipe),
-            recipe_client.post("/api/recipes", json=sample_recipe),
+            recipe_client.post("/api/recipes/", json=sample_recipe),
+            recipe_client.post("/api/recipes/", json=sample_recipe),
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)

@@ -2,10 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from ..core.recipe_manager import RecipeManager
-from ..middleware.auth import get_current_user
 from ..models.recipe import (
     RecipeCreateRequest,
     RecipeListResponse,
@@ -26,10 +25,15 @@ async def get_recipe_manager() -> RecipeManager:
     return RecipeManager(db)
 
 
+def get_user_id(request: Request) -> str | None:
+    """Extract user_id from request state (set by auth middleware)."""
+    return getattr(request.state, "user_id", None)
+
+
 @router.post("/", response_model=RecipeResponse, status_code=201)
 async def create_recipe(
     request: RecipeCreateRequest,
-    user_id: str = Depends(get_current_user),
+    user_id: str | None = Depends(get_user_id),
     manager: RecipeManager = Depends(get_recipe_manager),
 ) -> RecipeResponse:
     """
@@ -37,6 +41,9 @@ async def create_recipe(
 
     Validates recipe structure before saving to database.
     """
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User authentication required")
+
     try:
         recipe = await manager.create_recipe(
             user_id=user_id,
@@ -58,17 +65,20 @@ async def create_recipe(
 
 @router.get("/", response_model=RecipeListResponse)
 async def list_recipes(
-    user_id: str = Depends(get_current_user),
+    user_id: str | None = Depends(get_user_id),
     manager: RecipeManager = Depends(get_recipe_manager),
     tags: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=1000, description="Maximum number of recipes to return"),
+    offset: int = Query(0, ge=0, description="Number of recipes to skip"),
 ) -> RecipeListResponse:
     """
     List all recipes for the current user.
 
     Optionally filter by tags (comma-separated key:value pairs).
     """
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User authentication required")
+
     tag_filters = {}
     if tags:
         for tag in tags.split(","):
@@ -87,10 +97,13 @@ async def list_recipes(
 @router.get("/{recipe_id}", response_model=RecipeResponse)
 async def get_recipe(
     recipe_id: str,
-    user_id: str = Depends(get_current_user),
+    user_id: str | None = Depends(get_user_id),
     manager: RecipeManager = Depends(get_recipe_manager),
 ) -> RecipeResponse:
     """Get a specific recipe by ID."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User authentication required")
+
     recipe = await manager.get_recipe(recipe_id=recipe_id, user_id=user_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
@@ -101,10 +114,13 @@ async def get_recipe(
 async def update_recipe(
     recipe_id: str,
     request: RecipeUpdateRequest,
-    user_id: str = Depends(get_current_user),
+    user_id: str | None = Depends(get_user_id),
     manager: RecipeManager = Depends(get_recipe_manager),
 ) -> RecipeResponse:
     """Update an existing recipe."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User authentication required")
+
     try:
         recipe = await manager.update_recipe(
             recipe_id=recipe_id,
@@ -114,6 +130,8 @@ async def update_recipe(
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         return RecipeResponse(**recipe.model_dump(), message="Recipe updated successfully")
+    except HTTPException:
+        raise  # Re-raise HTTPException without catching it
     except RecipeValidationError as e:
         raise HTTPException(status_code=400, detail=f"Recipe validation failed: {str(e)}")
     except ValueError as e:
@@ -126,10 +144,13 @@ async def update_recipe(
 @router.delete("/{recipe_id}", status_code=204)
 async def delete_recipe(
     recipe_id: str,
-    user_id: str = Depends(get_current_user),
+    user_id: str | None = Depends(get_user_id),
     manager: RecipeManager = Depends(get_recipe_manager),
 ) -> None:
     """Delete a recipe."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User authentication required")
+
     success = await manager.delete_recipe(recipe_id=recipe_id, user_id=user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Recipe not found")

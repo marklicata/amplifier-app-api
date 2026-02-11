@@ -611,7 +611,7 @@ class Database:
         # Add tag filtering if provided
         if tag_filters:
             for key, value in tag_filters.items():
-                query += f" AND tags->>${len(params)} = ${len(params) + 1}"
+                query += f" AND tags->>${len(params) + 1} = ${len(params) + 2}"
                 params.extend([key, value])
 
         query += f" ORDER BY updated_at DESC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"

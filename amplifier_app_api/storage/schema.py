@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS configs (
 CREATE INDEX IF NOT EXISTS idx_configs_name ON configs(name);
 CREATE INDEX IF NOT EXISTS idx_configs_created_at ON configs(created_at);
 CREATE INDEX IF NOT EXISTS idx_configs_tags ON configs USING GIN(tags);
-CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
 
 DROP TRIGGER IF EXISTS update_configs_updated_at ON configs;
 CREATE TRIGGER update_configs_updated_at
@@ -61,10 +60,19 @@ BEGIN
         -- Rename column and convert to JSONB (this will fail if data isn't valid JSON)
         ALTER TABLE configs RENAME COLUMN yaml_content TO config_json;
         ALTER TABLE configs ALTER COLUMN config_json TYPE JSONB USING config_json::jsonb;
-
-        -- Add GIN index for config_json
-        CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
     END IF;
+
+    -- Ensure config_json column exists (handles case where table exists but column doesn't)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'configs' AND column_name = 'config_json'
+    ) THEN
+        -- Add config_json column if it doesn't exist
+        ALTER TABLE configs ADD COLUMN config_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    END IF;
+
+    -- Add GIN index for config_json (now safe to add after ensuring column exists)
+    CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
 END $$;
 """
 

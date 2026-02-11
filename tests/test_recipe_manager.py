@@ -17,17 +17,27 @@ async def recipe_manager(test_db):
 async def test_user_id(test_db):
     """Create a test user and return the user_id."""
     user_id = "test-user-123"
+
+    # Cleanup any existing data first
     async with test_db._pool.acquire() as conn:
-        # Create user if not exists
+        await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+        await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
+
+    async with test_db._pool.acquire() as conn:
         await conn.execute(
             """
             INSERT INTO users (user_id, first_seen, last_seen)
             VALUES ($1, NOW(), NOW())
-            ON CONFLICT (user_id) DO NOTHING
             """,
             user_id,
         )
-    return user_id
+
+    yield user_id
+
+    # Cleanup after test
+    async with test_db._pool.acquire() as conn:
+        await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+        await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
 
 @pytest_asyncio.fixture
@@ -134,33 +144,45 @@ class TestRecipeManagerCreate:
         user1 = "test-user-1"
         user2 = "test-user-2"
 
+        # Cleanup any existing data first
         async with test_db._pool.acquire() as conn:
             for user_id in [user1, user2]:
-                await conn.execute(
-                    """
-                    INSERT INTO users (user_id, first_seen, last_seen)
-                    VALUES ($1, NOW(), NOW())
-                    ON CONFLICT (user_id) DO NOTHING
-                    """,
-                    user_id,
-                )
+                await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
-        # Create recipes with same name for different users
-        recipe1 = await recipe_manager.create_recipe(
-            user_id=user1,
-            name="same-name",
-            recipe_data=sample_recipe_data,
-        )
+        try:
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute(
+                        """
+                        INSERT INTO users (user_id, first_seen, last_seen)
+                        VALUES ($1, NOW(), NOW())
+                        """,
+                        user_id,
+                    )
 
-        recipe2 = await recipe_manager.create_recipe(
-            user_id=user2,
-            name="same-name",
-            recipe_data=sample_recipe_data,
-        )
+            # Create recipes with same name for different users
+            recipe1 = await recipe_manager.create_recipe(
+                user_id=user1,
+                name="same-name",
+                recipe_data=sample_recipe_data,
+            )
 
-        assert recipe1.recipe_id != recipe2.recipe_id
-        assert recipe1.user_id == user1
-        assert recipe2.user_id == user2
+            recipe2 = await recipe_manager.create_recipe(
+                user_id=user2,
+                name="same-name",
+                recipe_data=sample_recipe_data,
+            )
+
+            assert recipe1.recipe_id != recipe2.recipe_id
+            assert recipe1.user_id == user1
+            assert recipe2.user_id == user2
+        finally:
+            # Cleanup
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                    await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
 
 @pytest.mark.asyncio
@@ -186,7 +208,7 @@ class TestRecipeManagerRead:
 
     async def test_get_recipe_not_exists(self, recipe_manager, test_user_id):
         """Test getting nonexistent recipe returns None."""
-        fetched = await recipe_manager.get_recipe("nonexistent-id", test_user_id)
+        fetched = await recipe_manager.get_recipe("00000000-0000-0000-0000-000000000000", test_user_id)
         assert fetched is None
 
     async def test_get_recipe_wrong_user(self, recipe_manager, test_db, sample_recipe_data):
@@ -195,27 +217,39 @@ class TestRecipeManagerRead:
         user1 = "test-user-1"
         user2 = "test-user-2"
 
+        # Cleanup any existing data first
         async with test_db._pool.acquire() as conn:
             for user_id in [user1, user2]:
-                await conn.execute(
-                    """
-                    INSERT INTO users (user_id, first_seen, last_seen)
-                    VALUES ($1, NOW(), NOW())
-                    ON CONFLICT (user_id) DO NOTHING
-                    """,
-                    user_id,
-                )
+                await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
-        # User1 creates recipe
-        recipe = await recipe_manager.create_recipe(
-            user_id=user1,
-            name="user1-recipe",
-            recipe_data=sample_recipe_data,
-        )
+        try:
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute(
+                        """
+                        INSERT INTO users (user_id, first_seen, last_seen)
+                        VALUES ($1, NOW(), NOW())
+                        """,
+                        user_id,
+                    )
 
-        # User2 tries to get it
-        fetched = await recipe_manager.get_recipe(recipe.recipe_id, user2)
-        assert fetched is None
+            # User1 creates recipe
+            recipe = await recipe_manager.create_recipe(
+                user_id=user1,
+                name="user1-recipe",
+                recipe_data=sample_recipe_data,
+            )
+
+            # User2 tries to get it
+            fetched = await recipe_manager.get_recipe(recipe.recipe_id, user2)
+            assert fetched is None
+        finally:
+            # Cleanup
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                    await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
     async def test_list_recipes_empty(self, recipe_manager, test_user_id):
         """Test listing recipes when none exist."""
@@ -357,7 +391,7 @@ class TestRecipeManagerUpdate:
     async def test_update_recipe_not_found(self, recipe_manager, test_user_id):
         """Test updating nonexistent recipe returns None."""
         updated = await recipe_manager.update_recipe(
-            "nonexistent-id", test_user_id, name="new-name"
+            "00000000-0000-0000-0000-000000000000", test_user_id, name="new-name"
         )
         assert updated is None
 
@@ -386,27 +420,39 @@ class TestRecipeManagerUpdate:
         user1 = "test-user-1"
         user2 = "test-user-2"
 
+        # Cleanup any existing data first
         async with test_db._pool.acquire() as conn:
             for user_id in [user1, user2]:
-                await conn.execute(
-                    """
-                    INSERT INTO users (user_id, first_seen, last_seen)
-                    VALUES ($1, NOW(), NOW())
-                    ON CONFLICT (user_id) DO NOTHING
-                    """,
-                    user_id,
-                )
+                await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
-        # User1 creates recipe
-        recipe = await recipe_manager.create_recipe(
-            user_id=user1,
-            name="user1-recipe",
-            recipe_data=sample_recipe_data,
-        )
+        try:
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute(
+                        """
+                        INSERT INTO users (user_id, first_seen, last_seen)
+                        VALUES ($1, NOW(), NOW())
+                        """,
+                        user_id,
+                    )
 
-        # User2 tries to update it
-        updated = await recipe_manager.update_recipe(recipe.recipe_id, user2, name="hacked")
-        assert updated is None
+            # User1 creates recipe
+            recipe = await recipe_manager.create_recipe(
+                user_id=user1,
+                name="user1-recipe",
+                recipe_data=sample_recipe_data,
+            )
+
+            # User2 tries to update it
+            updated = await recipe_manager.update_recipe(recipe.recipe_id, user2, name="hacked")
+            assert updated is None
+        finally:
+            # Cleanup
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                    await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
 
 @pytest.mark.asyncio
@@ -432,7 +478,7 @@ class TestRecipeManagerDelete:
 
     async def test_delete_recipe_not_found(self, recipe_manager, test_user_id):
         """Test deleting nonexistent recipe returns False."""
-        success = await recipe_manager.delete_recipe("nonexistent-id", test_user_id)
+        success = await recipe_manager.delete_recipe("00000000-0000-0000-0000-000000000000", test_user_id)
         assert success is False
 
     async def test_delete_recipe_wrong_user(self, recipe_manager, test_db, sample_recipe_data):
@@ -441,28 +487,40 @@ class TestRecipeManagerDelete:
         user1 = "test-user-1"
         user2 = "test-user-2"
 
+        # Cleanup any existing data first
         async with test_db._pool.acquire() as conn:
             for user_id in [user1, user2]:
-                await conn.execute(
-                    """
-                    INSERT INTO users (user_id, first_seen, last_seen)
-                    VALUES ($1, NOW(), NOW())
-                    ON CONFLICT (user_id) DO NOTHING
-                    """,
-                    user_id,
-                )
+                await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
 
-        # User1 creates recipe
-        recipe = await recipe_manager.create_recipe(
-            user_id=user1,
-            name="user1-recipe",
-            recipe_data=sample_recipe_data,
-        )
+        try:
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute(
+                        """
+                        INSERT INTO users (user_id, first_seen, last_seen)
+                        VALUES ($1, NOW(), NOW())
+                        """,
+                        user_id,
+                    )
 
-        # User2 tries to delete it
-        success = await recipe_manager.delete_recipe(recipe.recipe_id, user2)
-        assert success is False
+            # User1 creates recipe
+            recipe = await recipe_manager.create_recipe(
+                user_id=user1,
+                name="user1-recipe",
+                recipe_data=sample_recipe_data,
+            )
 
-        # Verify it still exists for user1
-        fetched = await recipe_manager.get_recipe(recipe.recipe_id, user1)
-        assert fetched is not None
+            # User2 tries to delete it
+            success = await recipe_manager.delete_recipe(recipe.recipe_id, user2)
+            assert success is False
+
+            # Verify it still exists for user1
+            fetched = await recipe_manager.get_recipe(recipe.recipe_id, user1)
+            assert fetched is not None
+        finally:
+            # Cleanup
+            async with test_db._pool.acquire() as conn:
+                for user_id in [user1, user2]:
+                    await conn.execute("DELETE FROM recipes WHERE user_id = $1", user_id)
+                    await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)

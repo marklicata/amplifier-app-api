@@ -12,7 +12,7 @@ async def recipe_client_e2e(test_db):
 
     import amplifier_app_api.storage.database as db_module
     from amplifier_app_api.api.recipes import router as recipes_router
-    from amplifier_app_api.middleware.auth import get_current_user
+    # Auth handled by dependency injection
     from amplifier_app_api.storage import get_db
 
     test_app = FastAPI()
@@ -20,18 +20,24 @@ async def recipe_client_e2e(test_db):
 
     # Create test user
     test_user_id = "e2e-test-user"
+
+    # Cleanup any existing data first
+    async with test_db._pool.acquire() as conn:
+        await conn.execute("DELETE FROM recipes WHERE user_id = $1", test_user_id)
+        await conn.execute("DELETE FROM users WHERE user_id = $1", test_user_id)
+
     async with test_db._pool.acquire() as conn:
         await conn.execute(
             """
             INSERT INTO users (user_id, first_seen, last_seen)
             VALUES ($1, NOW(), NOW())
-            ON CONFLICT (user_id) DO NOTHING
             """,
             test_user_id,
         )
 
     # Mock dependencies
-    test_app.dependency_overrides[get_current_user] = lambda: test_user_id
+    from amplifier_app_api.api.recipes import get_user_id
+    test_app.dependency_overrides[get_user_id] = lambda: test_user_id
     test_app.dependency_overrides[get_db] = lambda: test_db
 
     original_db = db_module._db
@@ -103,7 +109,7 @@ class TestRecipeLifecycle:
             "tags": {"category": "deployment", "criticality": "high"},
         }
 
-        create_response = await recipe_client_e2e.post("/api/recipes", json=create_payload)
+        create_response = await recipe_client_e2e.post("/api/recipes/", json=create_payload)
         assert create_response.status_code == 201
         recipe_id = create_response.json()["recipe_id"]
         assert recipe_id is not None
@@ -116,7 +122,7 @@ class TestRecipeLifecycle:
         assert len(recipe_data["recipe_data"]["steps"]) == 3
 
         # 3. List recipes (should include our new one)
-        list_response = await recipe_client_e2e.get("/api/recipes")
+        list_response = await recipe_client_e2e.get("/api/recipes/")
         assert list_response.status_code == 200
         recipes = list_response.json()["recipes"]
         assert any(r["recipe_id"] == recipe_id for r in recipes)
@@ -227,7 +233,7 @@ class TestComplexRecipeWorkflows:
         }
 
         # Create recipe
-        response = await recipe_client_e2e.post("/api/recipes", json=recipe)
+        response = await recipe_client_e2e.post("/api/recipes/", json=recipe)
         assert response.status_code == 201
         data = response.json()
 
@@ -317,7 +323,7 @@ class TestComplexRecipeWorkflows:
             },
         }
 
-        response = await recipe_client_e2e.post("/api/recipes", json=recipe)
+        response = await recipe_client_e2e.post("/api/recipes/", json=recipe)
         assert response.status_code == 201
 
         # Verify AI steps are correctly configured
@@ -367,17 +373,17 @@ class TestRecipeFilteringAndSearch:
                 "recipe_data": {**base_recipe_data, "name": recipe_spec["name"]},
                 "tags": recipe_spec["tags"],
             }
-            response = await recipe_client_e2e.post("/api/recipes", json=payload)
+            response = await recipe_client_e2e.post("/api/recipes/", json=payload)
             assert response.status_code == 201
 
         # Filter by category=deployment
-        response = await recipe_client_e2e.get("/api/recipes?tags=category:deployment")
+        response = await recipe_client_e2e.get("/api/recipes/?tags=category:deployment")
         data = response.json()
         assert len(data["recipes"]) == 2
         assert all("deployment" in r["tags"].get("category", "") for r in data["recipes"])
 
         # Filter by environment=staging
-        response = await recipe_client_e2e.get("/api/recipes?tags=environment:staging")
+        response = await recipe_client_e2e.get("/api/recipes/?tags=environment:staging")
         data = response.json()
         assert len(data["recipes"]) == 2
 
@@ -402,11 +408,11 @@ class TestRecipeFilteringAndSearch:
                 "recipe_data": {**base_recipe_data, "name": f"recipe-{i:03d}"},
                 "tags": {"index": str(i)},
             }
-            response = await recipe_client_e2e.post("/api/recipes", json=payload)
+            response = await recipe_client_e2e.post("/api/recipes/", json=payload)
             assert response.status_code == 201
 
         # Get total count
-        response = await recipe_client_e2e.get("/api/recipes")
+        response = await recipe_client_e2e.get("/api/recipes/")
         total = response.json()["total"]
         assert total == 25
 
@@ -416,7 +422,7 @@ class TestRecipeFilteringAndSearch:
         offset = 0
 
         while offset < total:
-            response = await recipe_client_e2e.get(f"/api/recipes?limit={page_size}&offset={offset}")
+            response = await recipe_client_e2e.get(f"/api/recipes/?limit={page_size}&offset={offset}")
             assert response.status_code == 200
             page_recipes = response.json()["recipes"]
             all_recipes.extend(page_recipes)
@@ -465,9 +471,10 @@ class TestRecipeValidationScenarios:
             },
         }
 
-        response = await recipe_client_e2e.post("/api/recipes", json=recipe)
-        assert response.status_code == 400
-        assert "not defined in a previous step" in response.json()["detail"]
+        response = await recipe_client_e2e.post("/api/recipes/", json=recipe)
+        assert response.status_code == 422  # Pydantic validation error
+        detail = response.json()["detail"]
+        assert any("not defined in a previous step" in str(d) for d in detail)
 
     async def test_valid_complex_dependency_graph(self, recipe_client_e2e):
         """Test that complex but valid dependency graphs work."""
@@ -510,7 +517,7 @@ class TestRecipeValidationScenarios:
             },
         }
 
-        response = await recipe_client_e2e.post("/api/recipes", json=recipe)
+        response = await recipe_client_e2e.post("/api/recipes/", json=recipe)
         assert response.status_code == 201
 
 
@@ -539,7 +546,7 @@ class TestRecipeMetadataOperations:
             "tags": {"old": "tag"},
         }
 
-        create_response = await recipe_client_e2e.post("/api/recipes", json=create_payload)
+        create_response = await recipe_client_e2e.post("/api/recipes/", json=create_payload)
         recipe_id = create_response.json()["recipe_id"]
         original_data = create_response.json()["recipe_data"]
 
@@ -580,10 +587,10 @@ class TestRecipeMetadataOperations:
             "recipe_data": base_recipe_data,
         }
 
-        await recipe_client_e2e.post("/api/recipes", json=create_payload)
+        await recipe_client_e2e.post("/api/recipes/", json=create_payload)
 
         # List recipes
-        list_response = await recipe_client_e2e.get("/api/recipes")
+        list_response = await recipe_client_e2e.get("/api/recipes/")
         recipes = list_response.json()["recipes"]
 
         # Verify metadata only (no recipe_data)
