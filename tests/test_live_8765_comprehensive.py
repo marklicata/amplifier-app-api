@@ -298,7 +298,7 @@ class TestResponseFormats:
         data = response.json()
         assert "status" in data
         assert "version" in data
-        assert data["version"] == "0.2.0"
+        assert data["version"] == "0.3.0"
 
     def test_version_response_format(self):
         """Test version endpoint returns expected format."""

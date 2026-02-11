@@ -378,44 +378,58 @@ instructions:
 ```bash
 #!/bin/bash
 
-# 1. Create minimal config
+# Create a complete config with all components
 CONFIG_ID=$(curl -s -X POST http://localhost:8765/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "programmatic-config",
-    "yaml_content": "bundle:\n  name: programmatic\n  version: 1.0.0\n",
+    "description": "Programmatically created config",
+    "config_data": {
+      "bundle": {
+        "name": "programmatic",
+        "version": "1.0.0"
+      },
+      "includes": [
+        {"bundle": "foundation"}
+      ],
+      "session": {
+        "orchestrator": {
+          "module": "loop-streaming",
+          "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+          "config": {}
+        },
+        "context": {
+          "module": "context-simple",
+          "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+          "config": {}
+        }
+      },
+      "providers": [{
+        "module": "provider-anthropic",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+        "config": {
+          "api_key": "${ANTHROPIC_API_KEY}",
+          "model": "claude-sonnet-4-5"
+        }
+      }],
+      "tools": [
+        {
+          "module": "tool-filesystem",
+          "source": "git+https://github.com/microsoft/amplifier-module-tool-filesystem@main"
+        },
+        {
+          "module": "tool-bash",
+          "source": "git+https://github.com/microsoft/amplifier-module-tool-bash@main"
+        }
+      ]
+    },
     "tags": {"env": "dev"}
   }' | jq -r '.config_id')
 
 echo "Created config: $CONFIG_ID"
 
-# 2. Add foundation bundle
-curl -X POST http://localhost:8765/configs/$CONFIG_ID/bundles \
-  -H "Content-Type: application/json" \
-  -d '{"bundle_uri": "git+https://github.com/microsoft/amplifier-foundation@main"}'
-
-# 3. Add Anthropic provider
-curl -X POST http://localhost:8765/configs/$CONFIG_ID/providers \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider_module": "provider-anthropic",
-    "provider_config": {
-      "default_model": "claude-sonnet-4-5-20250929",
-      "api_key": "${ANTHROPIC_API_KEY}"
-    }
-  }'
-
-# 4. Add tools
-curl -X POST http://localhost:8765/configs/$CONFIG_ID/tools \
-  -H "Content-Type: application/json" \
-  -d '{"tool_module": "tool-filesystem", "tool_source": "builtin"}'
-
-curl -X POST http://localhost:8765/configs/$CONFIG_ID/tools \
-  -H "Content-Type: application/json" \
-  -d '{"tool_module": "tool-bash", "tool_source": "builtin"}'
-
-# 5. Get the final config
-curl http://localhost:8765/configs/$CONFIG_ID | jq '.yaml_content'
+# Get the config to verify
+curl http://localhost:8765/configs/$CONFIG_ID | jq '.config_data'
 ```
 
 ### Example 4: Creating a Config from UI
@@ -423,43 +437,48 @@ curl http://localhost:8765/configs/$CONFIG_ID | jq '.yaml_content'
 ```javascript
 // Frontend code example
 async function createConfig(name, description, tags) {
-  // Create minimal config
+  // Create complete config with all components
   const response = await fetch('/configs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name,
       description,
-      yaml_content: `bundle:\n  name: ${name}\n  version: 1.0.0\n`,
+      config_data: {
+        bundle: {
+          name: name,
+          version: '1.0.0'
+        },
+        includes: [
+          { bundle: 'foundation' }
+        ],
+        session: {
+          orchestrator: {
+            module: 'loop-streaming',
+            source: 'git+https://github.com/microsoft/amplifier-module-loop-streaming@main',
+            config: {}
+          },
+          context: {
+            module: 'context-simple',
+            source: 'git+https://github.com/microsoft/amplifier-module-context-simple@main',
+            config: {}
+          }
+        },
+        providers: [{
+          module: 'provider-anthropic',
+          source: 'git+https://github.com/microsoft/amplifier-module-provider-anthropic@main',
+          config: {
+            api_key: '${ANTHROPIC_API_KEY}',
+            model: 'claude-sonnet-4-5'
+          }
+        }]
+      },
       tags
     })
   });
 
   const config = await response.json();
-  const configId = config.config_id;
-
-  // Add foundation bundle
-  await fetch(`/configs/${configId}/bundles`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      bundle_uri: 'git+https://github.com/microsoft/amplifier-foundation@main'
-    })
-  });
-
-  // Add provider
-  await fetch(`/configs/${configId}/providers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      provider_module: 'provider-anthropic',
-      provider_config: {
-        default_model: 'claude-sonnet-4-5-20250929'
-      }
-    })
-  });
-
-  return configId;
+  return config.config_id;
 }
 ```
 

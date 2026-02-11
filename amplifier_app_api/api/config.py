@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..core import ConfigManager
 from ..models import (
@@ -24,66 +24,89 @@ async def get_config_manager(db: Database = Depends(get_db)) -> ConfigManager:
     return ConfigManager(db)
 
 
+def get_user_id(request: Request) -> str | None:
+    """Extract user_id from request state (set by auth middleware)."""
+    return getattr(request.state, "user_id", None)
+
+
 @router.post(
     "",
     response_model=ConfigResponse,
     status_code=201,
     summary="Create a new config",
     description="""
-Create a new config (complete YAML bundle).
+Create a new config (complete bundle configuration).
 
-A config contains everything needed to start an Amplifier session:
-- Tools, providers, hooks
-- Session configuration (orchestrator, context manager)
-- Agents, spawn policies
-- All includes and dependencies
-
+A config contains everything needed to start an Amplifier session.
 Configs are reusable - create once, use for multiple sessions.
 
-The YAML content is validated for:
-- Valid YAML syntax
-- Required section: bundle
-- Required field: bundle.name
-- Other sections (session, providers, tools) are optional and can be provided via includes
+**Module Sources:** All modules (orchestrator, context, providers, tools) require a `source` field
+pointing to their git repository or installation source.
 
-Example minimal config:
-```yaml
-bundle:
-  name: my-config
-
-includes:
-  - bundle: foundation
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: claude-sonnet-4-5
+Example:
+```json
+{
+  "name": "my-config",
+  "config_data": {
+    "bundle": {"name": "my-config", "version": "1.0.0"},
+    "includes": [{"bundle": "foundation"}]
+  },
+  "session": {
+    "orchestrator": {
+      "module": "loop-streaming",
+      "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+      "config": {}
+    },
+    "context": {
+      "module": "context-simple",
+      "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+      "config": {}
+    }
+  },
+  "providers": [{
+    "module": "provider-anthropic",
+    "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+    "config": {"api_key": "${ANTHROPIC_API_KEY}", "model": "claude-sonnet-4-5"}
+  }]
+}
 ```
 """,
 )
 async def create_config(
     request: ConfigCreateRequest,
+    http_request: Request,
     manager: ConfigManager = Depends(get_config_manager),
 ) -> ConfigResponse:
-    """Create a new config with YAML validation."""
+    """Create a new config with validation."""
     try:
+        # Extract user_id from request state (set by auth middleware)
+        user_id = get_user_id(http_request)
+
+        # Merge optional top-level fields into config_data
+        config_data = dict(request.config_data)
+        if request.session is not None:
+            config_data["session"] = request.session
+        if request.includes is not None:
+            config_data["includes"] = request.includes
+        if request.tools is not None:
+            config_data["tools"] = request.tools
+        if request.providers is not None:
+            config_data["providers"] = request.providers
+
         config = await manager.create_config(
             name=request.name,
-            yaml_content=request.yaml_content,
+            config_data=config_data,
             description=request.description,
             tags=request.tags,
+            user_id=user_id,
         )
 
         return ConfigResponse(
             config_id=config.config_id,
             name=config.name,
             description=config.description,
-            yaml_content=config.yaml_content,
+            config_data=config.config_data,
+            user_id=config.user_id,
             created_at=config.created_at,
             updated_at=config.updated_at,
             tags=config.tags,
@@ -144,7 +167,8 @@ async def get_config(
         config_id=config.config_id,
         name=config.name,
         description=config.description,
-        yaml_content=config.yaml_content,
+        config_data=config.config_data,
+        user_id=config.user_id,
         created_at=config.created_at,
         updated_at=config.updated_at,
         tags=config.tags,
@@ -167,13 +191,43 @@ async def update_config(
         ConfigResponse: The updated config
 
     Raises:
-        HTTPException: 404 if not found, 400 if invalid YAML, 500 on other errors
+        HTTPException: 404 if not found, 400 if invalid config data, 500 on other errors
     """
     try:
+        # Merge optional top-level fields into config_data if provided
+        config_data = None
+        if request.config_data is not None or any(
+            [
+                request.session is not None,
+                request.includes is not None,
+                request.tools is not None,
+                request.providers is not None,
+            ]
+        ):
+            # Start with existing config_data or empty dict
+            if request.config_data is not None:
+                config_data = dict(request.config_data)
+            else:
+                # If no config_data provided but we have top-level fields, we need to merge with existing
+                existing_config = await manager.get_config(config_id)
+                if not existing_config:
+                    raise HTTPException(status_code=404, detail="Config not found")
+                config_data = dict(existing_config.config_data)
+
+            # Merge optional fields
+            if request.session is not None:
+                config_data["session"] = request.session
+            if request.includes is not None:
+                config_data["includes"] = request.includes
+            if request.tools is not None:
+                config_data["tools"] = request.tools
+            if request.providers is not None:
+                config_data["providers"] = request.providers
+
         config = await manager.update_config(
             config_id=config_id,
             name=request.name,
-            yaml_content=request.yaml_content,
+            config_data=config_data,
             description=request.description,
             tags=request.tags,
         )
@@ -185,7 +239,8 @@ async def update_config(
             config_id=config.config_id,
             name=config.name,
             description=config.description,
-            yaml_content=config.yaml_content,
+            config_data=config.config_data,
+            user_id=config.user_id,
             created_at=config.created_at,
             updated_at=config.updated_at,
             tags=config.tags,

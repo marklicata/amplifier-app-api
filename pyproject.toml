@@ -1,6 +1,6 @@
 [project]
 name = "amplifier-app-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "REST API service for Amplifier AI development platform"
 license = "MIT"
 readme = "README.md"
@@ -13,21 +13,32 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.3",
     "httpx>=0.28.1",
+    "aiohttp>=3.9.0",
     "python-multipart>=0.0.9",
     "asyncpg>=0.29.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    "cryptography>=44.0.0",
+    # Amplifier core components
     "amplifier-core",
-    "amplifier-foundation",
+    "amplifier-foundation",  # Includes orchestrators, context managers, and common tools
+    # Pre-install provider modules (not included in foundation)
+    "amplifier-module-provider-anthropic",
+    "amplifier-module-provider-openai",
+    "amplifier-module-provider-azure-openai",
+    "amplifier-module-provider-gemini",
+    "amplifier-module-provider-ollama",
+    "amplifier-module-provider-vllm",
+    # Telemetry
     "opencensus-ext-azure>=1.1.13",
     "azure-identity>=1.25.1",
-    # Provider SDK dependencies - pre-install common ones
-    "anthropic>=0.40.0",              # For provider-anthropic
-    "openai>=1.0.0",                  # For provider-openai and provider-azure-openai
-    "google-generativeai>=0.8.0",    # For provider-google/provider-gemini
-    "ollama>=0.4.0",                  # For provider-ollama
-    "boto3>=1.35.0",                  # For provider-bedrock (AWS)
-    "cohere>=5.0.0",                  # For provider-cohere
+    # Provider SDK dependencies
+    "anthropic>=0.40.0",
+    "openai>=1.0.0",
+    "google-generativeai>=0.8.0",
+    "ollama>=0.4.0",
+    "boto3>=1.35.0",
+    "cohere>=5.0.0"
 ]
 
 [project.scripts]
@@ -35,10 +46,17 @@ amplifier-service = "amplifier_app_api.main:main"
 
 [tool.uv]
 package = true
-# Override amplifier-core version to ensure our pinned version is used
-# even when dependencies (like amplifier-foundation) request a different version
+# Override all module dependencies to use canonical URLs (without .git suffix)
+# This prevents conflicts when modules specify different URL formats
 override-dependencies = [
-    "amplifier-core @ git+https://github.com/microsoft/amplifier-core.git@976fb87335ffe398cf0c1bd1bcd3c2f2c154fc3c"
+    "amplifier-core @ git+https://github.com/microsoft/amplifier-core@main",
+    "amplifier-foundation @ git+https://github.com/microsoft/amplifier-foundation@main",
+    "amplifier-module-provider-anthropic @ git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+    "amplifier-module-provider-openai @ git+https://github.com/microsoft/amplifier-module-provider-openai@main",
+    "amplifier-module-provider-azure-openai @ git+https://github.com/microsoft/amplifier-module-provider-azure-openai@main",
+    "amplifier-module-provider-gemini @ git+https://github.com/microsoft/amplifier-module-provider-gemini@main",
+    "amplifier-module-provider-ollama @ git+https://github.com/microsoft/amplifier-module-provider-ollama@main",
+    "amplifier-module-provider-vllm @ git+https://github.com/microsoft/amplifier-module-provider-vllm@main",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -60,10 +78,17 @@ dev = [
     "pyright>=1.1.0",
 ]
 
-# Using specific commit hashes to prevent breaking changes
 [tool.uv.sources]
-amplifier-core = { git = "https://github.com/microsoft/amplifier-core.git", rev = "976fb87335ffe398cf0c1bd1bcd3c2f2c154fc3c" }
-amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation.git", rev = "412fcb51980523c77339c32ef1ba3bc80c13b680" }
+# All components point to @main - locked at Docker build time
+# Note: Using URLs without .git suffix for consistency with module dependencies
+amplifier-core = { git = "https://github.com/microsoft/amplifier-core", branch = "main" }
+amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation", branch = "main" }
+amplifier-module-provider-anthropic = { git = "https://github.com/microsoft/amplifier-module-provider-anthropic", branch = "main" }
+amplifier-module-provider-openai = { git = "https://github.com/microsoft/amplifier-module-provider-openai", branch = "main" }
+amplifier-module-provider-azure-openai = { git = "https://github.com/microsoft/amplifier-module-provider-azure-openai", branch = "main" }
+amplifier-module-provider-gemini = { git = "https://github.com/microsoft/amplifier-module-provider-gemini", branch = "main" }
+amplifier-module-provider-ollama = { git = "https://github.com/microsoft/amplifier-module-provider-ollama", branch = "main" }
+amplifier-module-provider-vllm = { git = "https://github.com/microsoft/amplifier-module-provider-vllm", branch = "main" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

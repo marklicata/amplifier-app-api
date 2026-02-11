@@ -18,20 +18,27 @@ class TestCompleteSessionFlow:
                 "/configs",
                 json={
                     "name": "test-config",
-                    "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                    "config_data": {
+                        "bundle": {"name": "test", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
                 },
             )
 
@@ -73,20 +80,27 @@ providers:
                 "/configs",
                 json={
                     "name": "test-config-2",
-                    "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                    "config_data": {
+                        "bundle": {"name": "test", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
                 },
             )
 
@@ -124,20 +138,27 @@ providers:
                 "/configs",
                 json={
                     "name": "test-config-3",
-                    "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                    "config_data": {
+                        "bundle": {"name": "test", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
                 },
             )
 
@@ -162,48 +183,49 @@ providers:
 class TestConfigurationFlow:
     """Test configuration management flows."""
 
-    async def test_add_provider_then_list_flow(self):
-        """Test adding provider and verifying it appears in list."""
+    async def test_create_and_list_configs(self):
+        """Test creating configs and verifying they appear in list."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Add provider
-            add_response = await client.post(
-                "/config/providers",
-                json={"provider": "test-provider", "api_key": "test-key"},
-            )
-            assert add_response.status_code == 200
-
-            # List providers
-            list_response = await client.get("/config/providers")
-            assert list_response.status_code == 200
-            providers = list_response.json()
-
-            # Verify it's in the list
-            provider_names = [p["name"] for p in providers]
-            assert "test-provider" in provider_names
-
-    async def test_add_bundle_then_activate_flow(self):
-        """Test adding bundle and activating it."""
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Add bundle
-            add_response = await client.post(
-                "/bundles",
+            # Create a config
+            config_response = await client.post(
+                "/configs",
                 json={
-                    "source": "git+https://github.com/example/test-bundle",
-                    "name": "test-bundle",
+                    "name": "test-flow-config",
+                    "config_data": {
+                        "bundle": {"name": "test-flow", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
                 },
             )
-            assert add_response.status_code == 200
+            assert config_response.status_code == 201
 
-            # Activate bundle
-            activate_response = await client.post("/bundles/test-bundle/activate")
-            # Should succeed now that bundle exists
-            assert activate_response.status_code in [200, 500]
+            config_id = config_response.json()["config_id"]
 
-            # Verify it's active
-            list_response = await client.get("/bundles")
-            if list_response.status_code == 200:
-                data = list_response.json()
-                assert data.get("active") == "test-bundle"
+            # List configs
+            list_response = await client.get("/configs")
+            assert list_response.status_code == 200
+            configs = list_response.json()
+
+            # Verify it's in the list
+            config_ids = [c["config_id"] for c in configs["configs"]]
+            assert config_id in config_ids
 
 
 @pytest.mark.asyncio
@@ -218,20 +240,27 @@ class TestConcurrency:
                 "/configs",
                 json={
                     "name": "test-config-concurrent",
-                    "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                    "config_data": {
+                        "bundle": {"name": "test", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
                 },
             )
 
@@ -292,20 +321,27 @@ class TestDataPersistence:
                 "/configs",
                 json={
                     "name": "test-config-persist",
-                    "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                    "config_data": {
+                        "bundle": {"name": "test", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
                 },
             )
 
@@ -335,17 +371,48 @@ providers:
     async def test_config_persists_after_update(self):
         """Test configuration persists after update."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Create a config
+            create_response = await client.post(
+                "/configs",
+                json={
+                    "name": "update-test",
+                    "config_data": {
+                        "bundle": {"name": "test", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}],
+                        "session": {
+                            "orchestrator": {
+                                "module": "loop-basic",
+                                "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                                "config": {}
+                            },
+                            "context": {
+                                "module": "context-simple",
+                                "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                                "config": {}
+                            }
+                        },
+                        "providers": [{
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                        }]
+                    },
+                },
+            )
+            assert create_response.status_code == 201
+            config_id = create_response.json()["config_id"]
+
             # Update config
-            update_response = await client.post(
-                "/config",
-                json={"providers": {"test": {"config": {"value": "123"}}}},
+            update_response = await client.put(
+                f"/configs/{config_id}",
+                json={"description": "Updated description"},
             )
             assert update_response.status_code == 200
 
             # Retrieve config
-            get_response = await client.get("/config")
+            get_response = await client.get(f"/configs/{config_id}")
             assert get_response.status_code == 200
             data = get_response.json()
 
             # Verify persisted
-            assert "test" in data["providers"]
+            assert data["description"] == "Updated description"

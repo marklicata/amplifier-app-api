@@ -45,16 +45,10 @@ class TestSmokeCRUD:
         response = await client.get("/configs")
         assert response.status_code == 200
 
-    async def test_bundles_endpoint_exists(self, client: AsyncClient):
-        """Test bundles endpoint is accessible."""
-        response = await client.get("/bundles")
+    async def test_applications_endpoint_exists(self, client: AsyncClient):
+        """Test applications endpoint is accessible."""
+        response = await client.get("/applications")
         assert response.status_code == 200
-
-    async def test_tools_endpoint_exists(self, client: AsyncClient):
-        """Test tools endpoint is accessible."""
-        response = await client.get("/tools")
-        # May fail without proper setup, but endpoint should exist
-        assert response.status_code in [200, 500]
 
 
 @pytest.mark.asyncio
@@ -68,20 +62,30 @@ class TestSmokeDataIntegrity:
             "/configs",
             json={
                 "name": "test-config-smoke",
-                "yaml_content": """
-bundle:
-  name: test
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                "description": "Smoke test configuration",
+                "config_data": {
+                    "bundle": {"name": "test", "version": "1.0.0"},
+                    "includes": [{"bundle": "foundation"}],
+                    "session": {
+                        "orchestrator": {
+                            "module": "loop-streaming",
+                            "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+                            "config": {},
+                        },
+                        "context": {
+                            "module": "context-simple",
+                            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                            "config": {},
+                        },
+                    },
+                    "providers": [
+                        {
+                            "module": "provider-anthropic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                            "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"},
+                        }
+                    ],
+                },
             },
         )
 
@@ -94,7 +98,7 @@ providers:
         if response.status_code == 201:
             data = response.json()
             session_id = data["session_id"]
-            # Should have a session_id (mock returns "mock-session-123")
+            # Should have a session_id
             assert session_id
             assert isinstance(session_id, str)
             assert len(session_id) > 0

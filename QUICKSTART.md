@@ -147,7 +147,7 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "uptime_seconds": 5.2,
   "database_connected": true
 }

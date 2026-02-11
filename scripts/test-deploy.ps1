@@ -1,3 +1,7 @@
+param(
+    [switch]$nocache
+)
+
 # Docker Image Testing Script
 # Run this locally to validate your Docker image before deploying
 
@@ -21,7 +25,12 @@ Write-Host ""
 
 # Step 2: Build code and image
 Write-Host "[Step 2/4] Building Docker image..." -ForegroundColor Yellow
-docker-compose build
+if ($nocache) {
+    Write-Host "  (--no-cache enabled)" -ForegroundColor DarkYellow
+    docker-compose build --no-cache
+} else {
+    docker-compose build
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Failed to build Docker image!" -ForegroundColor Red

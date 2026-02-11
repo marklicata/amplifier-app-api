@@ -81,7 +81,7 @@ amplifier-service
 curl http://localhost:8765/health
 
 # Should return:
-# {"status": "healthy", "version": "0.2.0", "uptime_seconds": 5.2, "database_connected": true}
+# {"status": "healthy", "version": "0.3.0", "uptime_seconds": 5.2, "database_connected": true}
 
 # Access API documentation
 open http://localhost:8765/docs
@@ -367,7 +367,7 @@ docker-compose restart amplifier-service
 
 ### 1. Create a Config
 
-First, create a config (YAML bundle):
+First, create a config with config_data:
 
 ```bash
 curl -X POST http://localhost:8765/configs \
@@ -375,9 +375,39 @@ curl -X POST http://localhost:8765/configs \
   -d '{
     "name": "test-config",
     "description": "Test configuration",
-    "yaml_content": "bundle:\n  name: test\n  version: 1.0.0\n\nincludes:\n  - bundle: foundation\n\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: ${ANTHROPIC_API_KEY}\n      model: claude-sonnet-4-5\n\nsession:\n  orchestrator: loop-basic\n  context: context-simple"
+    "config_data": {
+      "bundle": {
+        "name": "test",
+        "version": "1.0.0"
+      },
+      "includes": [
+        {"bundle": "foundation"}
+      ],
+      "session": {
+        "orchestrator": {
+          "module": "loop-streaming",
+          "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+          "config": {}
+        },
+        "context": {
+          "module": "context-simple",
+          "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+          "config": {}
+        }
+      },
+      "providers": [{
+        "module": "provider-anthropic",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+        "config": {
+          "api_key": "${ANTHROPIC_API_KEY}",
+          "model": "claude-sonnet-4-5"
+        }
+      }]
+    }
   }'
 ```
+
+**Note:** All modules (orchestrator, context, providers) require a `source` field pointing to their git repository.
 
 ### 2. Create a Session from Config
 

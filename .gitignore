@@ -62,3 +62,4 @@ temp/
 dist/
 build/
 *.whl
+openapi*.json

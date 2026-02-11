@@ -21,7 +21,7 @@ class TestHealthEndpoints:
         data = response.json()
         assert data["status"] in ["healthy", "degraded"]
         assert "version" in data
-        assert data["version"] == "0.2.0"
+        assert data["version"] == "0.3.0"
         assert "database_connected" in data
 
     def test_version_endpoint(self):
@@ -30,7 +30,7 @@ class TestHealthEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert "service_version" in data
-        assert data["service_version"] == "0.2.0"
+        assert data["service_version"] == "0.3.0"
 
     def test_root_endpoint(self):
         """Test root endpoint."""
