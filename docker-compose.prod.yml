@@ -9,7 +9,7 @@ services:
 
       # Authentication - Production Settings
       #############################################
-      AUTH_REQUIRED: true  # Set to true for production authentication.
+      AUTH_REQUIRED: false  # Set to true for production authentication.
       #############################################
 
       # Database - Production settings
