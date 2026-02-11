@@ -182,8 +182,8 @@ class SessionManager:
             logger.info(f"Using cached bundle for config: {config_id}")
             return self._prepared_bundles[config_id]
 
-        # Get config from database
-        config = await self.config_manager.get_config(config_id)
+        # Get config from database (decrypt=True for internal session use)
+        config = await self.config_manager.get_config(config_id, decrypt=True)
         if not config:
             raise ValueError(f"Config not found: {config_id}")
 
@@ -264,8 +264,8 @@ class SessionManager:
         """
         session_id = str(uuid.uuid4())
 
-        # Verify config exists
-        config = await self.config_manager.get_config(config_id)
+        # Verify config exists (decrypt=True for internal session use)
+        config = await self.config_manager.get_config(config_id, decrypt=True)
         if not config:
             raise ValueError(f"Config not found: {config_id}")
 

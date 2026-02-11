@@ -28,12 +28,13 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 ### Statistics
 
-- **Total test files:** 28 (removed 6 obsolete test files)
-- **Total test cases:** 360+
-- **Lines of test code:** 10,000+
+- **Total test files:** 31 (including 3 new encryption test files)
+- **Total test cases:** 400+
+- **Lines of test code:** 11,000+
 - **API endpoint coverage:** 100% (23/23 endpoints)
 - **E2E coverage:** All endpoints tested with real HTTP server
-- **Test types:** Unit, Integration, E2E
+- **Encryption coverage:** 100% (unit, integration, API)
+- **Test types:** Unit, Integration, API, E2E
 
 ### Test Types
 
@@ -41,10 +42,12 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 |------|-------|-------|-------------|
 | **Infrastructure** | 41 | ~2s | Database + Models (ASGI in-process) |
 | **Authentication** | 26 | ~15s | Applications, middleware, integration |
+| **Encryption** | 36+ | ~3s | Unit, integration, API decrypt parameter |
 | **E2E - Core Features** | 20 | ~2-5min | Messages, streaming |
 | **E2E - Comprehensive** | 50+ | Varies | All endpoint validation |
 | **Smoke** | 13 | ~5s | Quick health checks |
 
+**Total Fast Tests:** 103+ tests in ~20 seconds
 **Total E2E Tests:** 70+ tests with real HTTP server
 
 ---
@@ -60,8 +63,11 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 # Authentication: All auth tests (26 tests, ~15 seconds)
 .venv/bin/python -m pytest tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py -v
 
-# All fast tests (67 tests, ~17 seconds)
-.venv/bin/python -m pytest tests/test_database.py tests/test_models.py tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py -v
+# Encryption: All encryption tests (36+ tests, ~3 seconds)
+.venv/bin/python -m pytest tests/test_secrets_encryption.py tests/test_encryption.py tests/test_config_decrypt_api.py -v
+
+# All fast tests (103+ tests, ~20 seconds)
+.venv/bin/python -m pytest tests/test_database.py tests/test_models.py tests/test_applications.py tests/test_auth_middleware.py tests/test_auth_integration.py tests/test_secrets_encryption.py tests/test_encryption.py tests/test_config_decrypt_api.py -v
 ```
 
 ### E2E Tests (Real HTTP Server)
@@ -123,6 +129,41 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 - **`test_auth_integration.py`** (3 tests) - End-to-end auth flows
 
 See [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) for detailed authentication testing guide.
+
+### Encryption Tests ✅
+
+- **`test_secrets_encryption.py`** (15 tests) - Unit tests for encryption module
+- **`test_encryption.py`** (6 tests) - Config manager encryption integration tests
+- **`test_config_decrypt_api.py`** (15+ tests) - API decrypt parameter tests
+
+**Encryption Test Coverage:**
+- ✅ Encryption/decryption of sensitive fields (api_key, secret, password, token, etc.)
+- ✅ decrypt parameter in GET /configs/{id}
+- ✅ encrypted flag in API responses
+- ✅ Pre-encrypted keys handling
+- ✅ Environment variable references (not encrypted)
+- ✅ Multiple sensitive fields in nested structures
+- ✅ Concurrent decrypt requests
+- ✅ Update with new encrypted keys
+- ✅ Behavior without encryption key
+- ✅ App workflow examples (encrypt before send, decrypt locally)
+
+**Run encryption tests:**
+```bash
+# All encryption tests (36+ tests, ~3 seconds)
+pytest tests/test_secrets_encryption.py tests/test_encryption.py tests/test_config_decrypt_api.py -v
+
+# Unit tests only (encryption module)
+pytest tests/test_secrets_encryption.py -v
+
+# Integration tests (config manager with encryption)
+pytest tests/test_encryption.py -v
+
+# API tests (decrypt parameter)
+pytest tests/test_config_decrypt_api.py -v
+```
+
+See [ENCRYPTION_GUIDE.md](./ENCRYPTION_GUIDE.md) for detailed encryption implementation guide.
 
 ### End-to-End Tests (Real HTTP Server) ✅
 

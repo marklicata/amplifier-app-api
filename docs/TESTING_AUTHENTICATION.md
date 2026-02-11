@@ -22,6 +22,17 @@ The authentication system supports two modes:
 
 **Default Development Mode**: Authentication is **disabled** (`AUTH_REQUIRED=false`) for easier local development.
 
+### GitHub Authentication in Dev Mode (NEW)
+
+When authentication is disabled (`AUTH_REQUIRED=false`), the system now automatically uses your **GitHub identity** from the `gh` CLI instead of a hardcoded `"dev-user"`:
+
+- ✅ **If `gh` CLI is installed and authenticated**: Uses your GitHub username (e.g., `marklicata`)
+- ✅ **If `gh` CLI is not available**: Falls back to `"dev-user"`
+- ✅ **Zero configuration**: Works automatically if you're logged into GitHub CLI
+- ✅ **Better testing**: Each developer gets their own `user_id` without auth setup
+
+**To disable this feature**, set `USE_GITHUB_AUTH_IN_DEV=false` in your `.env` file.
+
 ---
 
 ## Quick Start: Running All Tests
@@ -74,6 +85,21 @@ curl http://localhost:8765/health
 ```
 
 ✅ **Expected**: All requests succeed without any auth headers.
+
+**What `user_id` is used?**
+- If you're logged into GitHub CLI (`gh auth status` shows ✓): Your GitHub username
+- If not logged in or `gh` not installed: `"dev-user"`
+- To always use `"dev-user"`: Set `USE_GITHUB_AUTH_IN_DEV=false` in `.env`
+
+```bash
+# Check what user_id you're using:
+gh auth status
+# If logged in, your GitHub username will be used
+# To see which user created a session, check the session response
+
+# To force dev-user instead of GitHub username:
+echo "USE_GITHUB_AUTH_IN_DEV=false" >> .env
+```
 
 ---
 
@@ -479,6 +505,7 @@ Before deploying to production with authentication enabled:
 # Authentication
 AUTH_REQUIRED=false              # Enable/disable auth
 AUTH_MODE=api_key_jwt           # api_key_jwt | jwt_only
+USE_GITHUB_AUTH_IN_DEV=true     # Use gh CLI for user_id in dev mode
 API_KEY_HEADER=X-API-Key        # Header name for API key
 
 # JWT Settings

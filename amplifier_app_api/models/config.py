@@ -159,6 +159,10 @@ class ConfigResponse(BaseModel):
     updated_at: datetime
     tags: dict[str, str] = Field(default_factory=dict)
     message: str | None = None
+    encrypted: bool = Field(
+        default=False,
+        description="True if sensitive fields in config_data are encrypted (have 'enc:' prefix), False if decrypted",
+    )
 
 
 class ConfigListResponse(BaseModel):

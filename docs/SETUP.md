@@ -81,7 +81,7 @@ amplifier-service
 curl http://localhost:8765/health
 
 # Should return:
-# {"status": "healthy", "version": "0.3.0", "uptime_seconds": 5.2, "database_connected": true}
+# {"status": "healthy", "version": "0.4.0", "uptime_seconds": 5.2, "database_connected": true}
 
 # Access API documentation
 open http://localhost:8765/docs

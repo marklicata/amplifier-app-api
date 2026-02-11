@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS configs (
 CREATE INDEX IF NOT EXISTS idx_configs_name ON configs(name);
 CREATE INDEX IF NOT EXISTS idx_configs_created_at ON configs(created_at);
 CREATE INDEX IF NOT EXISTS idx_configs_tags ON configs USING GIN(tags);
-CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
 
 DROP TRIGGER IF EXISTS update_configs_updated_at ON configs;
 CREATE TRIGGER update_configs_updated_at
@@ -61,10 +60,19 @@ BEGIN
         -- Rename column and convert to JSONB (this will fail if data isn't valid JSON)
         ALTER TABLE configs RENAME COLUMN yaml_content TO config_json;
         ALTER TABLE configs ALTER COLUMN config_json TYPE JSONB USING config_json::jsonb;
-
-        -- Add GIN index for config_json
-        CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
     END IF;
+
+    -- Ensure config_json column exists (handles case where table exists but column doesn't)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'configs' AND column_name = 'config_json'
+    ) THEN
+        -- Add config_json column if it doesn't exist
+        ALTER TABLE configs ADD COLUMN config_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    END IF;
+
+    -- Add GIN index for config_json (now safe to add after ensuring column exists)
+    CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
 END $$;
 """
 
@@ -171,6 +179,33 @@ CREATE TRIGGER update_configuration_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 """
 
+# Recipes table - stores recipe definitions as JSON
+CREATE_RECIPES_TABLE = """
+CREATE TABLE IF NOT EXISTS recipes (
+    recipe_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
+    recipe_data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    tags JSONB DEFAULT '{}'::jsonb,
+
+    UNIQUE(user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes(user_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_name ON recipes(name);
+CREATE INDEX IF NOT EXISTS idx_recipes_tags ON recipes USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_recipes_recipe_data ON recipes USING GIN(recipe_data);
+
+DROP TRIGGER IF EXISTS update_recipes_updated_at ON recipes;
+CREATE TRIGGER update_recipes_updated_at
+    BEFORE UPDATE ON recipes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+"""
+
 # Complete schema initialization - executes in order
 INIT_SCHEMA = f"""
 -- Create helper functions
@@ -189,4 +224,5 @@ INIT_SCHEMA = f"""
 {CREATE_SESSIONS_TABLE}
 {CREATE_SESSION_PARTICIPANTS_TABLE}
 {CREATE_CONFIGURATION_TABLE}
+{CREATE_RECIPES_TABLE}
 """

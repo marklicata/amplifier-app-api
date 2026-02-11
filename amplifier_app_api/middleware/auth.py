@@ -1,6 +1,8 @@
 """Authentication middleware for API key and JWT verification."""
 
+import asyncio
 import logging
+import subprocess
 from collections.abc import Callable
 
 import bcrypt
@@ -13,6 +15,9 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
+# Cache GitHub username to avoid repeated subprocess calls
+_github_user_cache: str | None = None
+
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware for authenticating requests with API key + JWT.
@@ -23,7 +28,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     Sets on request.state:
     - app_id: Application identifier
-    - user_id: User identifier from JWT 'sub' claim
+    - user_id: User identifier from JWT 'sub' claim (or GitHub username in dev mode)
     """
 
     # Paths that don't require authentication
@@ -36,6 +41,64 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/openapi.json",
         "/applications",  # Need to register to get API keys!
     ]
+
+    @staticmethod
+    async def _get_github_user() -> str:
+        """Get GitHub username from gh CLI, with fallback to 'dev-user'.
+
+        Uses cached value to avoid repeated subprocess calls.
+        Runs gh CLI in a subprocess with timeout.
+
+        Returns:
+            GitHub username if gh CLI is authenticated, otherwise 'dev-user'
+        """
+        global _github_user_cache
+
+        # Return cached value if available
+        if _github_user_cache is not None:
+            return _github_user_cache
+
+        try:
+            # Run gh CLI to get authenticated user
+            # --jq extracts just the login field from the JSON response
+            result = await asyncio.wait_for(
+                asyncio.create_subprocess_exec(
+                    "gh",
+                    "api",
+                    "user",
+                    "--jq",
+                    ".login",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                ),
+                timeout=2.0,
+            )
+
+            stdout, stderr = await result.communicate()
+
+            if result.returncode == 0 and stdout:
+                username = stdout.decode().strip()
+                if username:
+                    _github_user_cache = username
+                    logger.info(f"Using GitHub user from gh CLI: {username}")
+                    return username
+
+            # Log why gh CLI failed (helps debugging)
+            if stderr:
+                error_msg = stderr.decode().strip()
+                logger.debug(f"gh CLI failed: {error_msg}")
+
+        except asyncio.TimeoutError:
+            logger.debug("gh CLI timed out (2s)")
+        except FileNotFoundError:
+            logger.debug("gh CLI not found in PATH")
+        except Exception as e:
+            logger.debug(f"Failed to get GitHub user: {e}")
+
+        # Fallback to dev-user
+        _github_user_cache = "dev-user"
+        logger.debug("Falling back to 'dev-user'")
+        return "dev-user"
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request through authentication."""
@@ -50,8 +113,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip auth if not required (dev mode)
         if not settings.auth_required:
             request.state.app_id = "dev-app"
-            request.state.user_id = "dev-user"
-            logger.debug("Auth disabled - using dev credentials")
+
+            # Use GitHub CLI to get user_id if enabled, otherwise use dev-user
+            if settings.use_github_auth_in_dev:
+                request.state.user_id = await self._get_github_user()
+            else:
+                request.state.user_id = "dev-user"
+
+            logger.debug(
+                f"Auth disabled - using dev credentials (app_id={request.state.app_id}, "
+                f"user_id={request.state.user_id})"
+            )
             return await call_next(request)
 
         try:

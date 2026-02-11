@@ -274,6 +274,7 @@ DATABASE_URL=sqlite+aiosqlite:///./amplifier.db
 # Authentication (disabled by default for local dev)
 AUTH_REQUIRED=false                    # Set true for production
 AUTH_MODE=api_key_jwt                  # api_key_jwt | jwt_only
+USE_GITHUB_AUTH_IN_DEV=true           # Use gh CLI for user_id in dev mode
 SECRET_KEY=generate-new-key-here       # openssl rand -hex 32
 JWT_ALGORITHM=HS256                    # HS256 (dev) | RS256 (prod)
 JWT_PUBLIC_KEY_URL=                    # JWKS endpoint for RS256
@@ -299,6 +300,10 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 **For local development** (default):
 - `AUTH_REQUIRED=false` - No authentication needed
 - All endpoints accessible without credentials
+- **NEW**: Automatically uses your GitHub username from `gh` CLI as `user_id`
+  - If `gh auth status` shows you're logged in → Uses your GitHub username
+  - If not logged in or `gh` not installed → Falls back to `"dev-user"`
+  - To disable: Set `USE_GITHUB_AUTH_IN_DEV=false` in `.env`
 
 **For production**:
 1. Set `AUTH_REQUIRED=true`
