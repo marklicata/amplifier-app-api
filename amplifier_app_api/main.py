@@ -13,6 +13,7 @@ from .api import (
     applications_router,
     config_router,
     health_router,
+    recipes_router,
     sessions_router,
 )
 from .config import settings
@@ -121,6 +122,13 @@ Lightweight runtime instances that reference a Config:
 - `DELETE /api/configs/{id}` - Delete config
 - `POST /api/configs/validate` - Validate config (no save)
 
+### Recipe Management
+- `GET /api/recipes` - List recipes (user-specific)
+- `POST /api/recipes` - Create recipe (validates before save)
+- `GET /api/recipes/{id}` - Get recipe
+- `PUT /api/recipes/{id}` - Update recipe
+- `DELETE /api/recipes/{id}` - Delete recipe
+
 ### Session Management
 - `GET /api/sessions` - List sessions
 - `POST /api/sessions` - Create session
@@ -166,6 +174,7 @@ app.include_router(health_router)
 app.include_router(applications_router)
 app.include_router(sessions_router)
 app.include_router(config_router)
+app.include_router(recipes_router)
 
 # Import and register smoke tests router (after app is defined to avoid circular import)
 from .api.smoke import router as smoke_router  # noqa: E402

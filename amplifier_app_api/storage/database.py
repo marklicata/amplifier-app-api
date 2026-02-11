@@ -491,6 +491,159 @@ class Database:
             for row in rows
         }
 
+    # Recipe operations
+    async def create_recipe(
+        self,
+        recipe_id: str,
+        user_id: str,
+        name: str,
+        recipe_json: str,
+        description: str | None = None,
+        version: str = "1.0.0",
+        tags: dict[str, str] | None = None,
+    ) -> None:
+        """Create a new recipe."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO recipes (
+                    recipe_id, user_id, name, description, version, recipe_data, tags
+                )
+                VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+                """,
+                recipe_id,
+                user_id,
+                name,
+                description,
+                version,
+                recipe_json,
+                json.dumps(tags or {}),
+            )
+
+        logger.debug(f"Created recipe: {recipe_id}")
+
+    async def get_recipe(self, recipe_id: str, user_id: str) -> dict[str, Any] | None:
+        """Get recipe by ID for a specific user."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM recipes WHERE recipe_id = $1 AND user_id = $2", recipe_id, user_id
+            )
+
+        if row:
+            return {
+                "recipe_id": str(row["recipe_id"]),
+                "user_id": row["user_id"],
+                "name": row["name"],
+                "description": row["description"],
+                "version": row["version"],
+                "recipe_data": json.loads(row["recipe_data"])
+                if isinstance(row["recipe_data"], str)
+                else row["recipe_data"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "tags": json.loads(row["tags"]) if isinstance(row["tags"], str) else row["tags"],
+            }
+        return None
+
+    async def update_recipe(self, recipe_id: str, user_id: str, **kwargs) -> None:
+        """Update recipe fields."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        updates = ["updated_at = NOW()"]
+        params: list[Any] = []
+        param_idx = 1
+
+        for key, value in kwargs.items():
+            if key in ("tags", "recipe_data"):
+                updates.append(f"{key} = ${param_idx}::jsonb")
+                params.append(json.dumps(value) if key == "tags" else value)
+            else:
+                updates.append(f"{key} = ${param_idx}")
+                params.append(value)
+            param_idx += 1
+
+        params.extend([recipe_id, user_id])
+
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                f"UPDATE recipes SET {', '.join(updates)} WHERE recipe_id = ${param_idx} AND user_id = ${param_idx + 1}",
+                *params,
+            )
+
+        logger.debug(f"Updated recipe: {recipe_id}")
+
+    async def delete_recipe(self, recipe_id: str, user_id: str) -> bool:
+        """Delete recipe."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM recipes WHERE recipe_id = $1 AND user_id = $2", recipe_id, user_id
+            )
+
+        deleted = result.split()[-1] != "0" if result else False
+        if deleted:
+            logger.debug(f"Deleted recipe: {recipe_id}")
+        return deleted
+
+    async def list_recipes(
+        self, user_id: str, tag_filters: dict[str, str] | None = None, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """List all recipes for a user."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        query = """
+            SELECT recipe_id, user_id, name, description, version, created_at, updated_at, tags
+            FROM recipes
+            WHERE user_id = $1
+        """
+        params: list[Any] = [user_id]
+
+        # Add tag filtering if provided
+        if tag_filters:
+            for key, value in tag_filters.items():
+                query += f" AND tags->>${len(params)} = ${len(params) + 1}"
+                params.extend([key, value])
+
+        query += f" ORDER BY updated_at DESC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"
+        params.extend([limit, offset])
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
+
+        return [
+            {
+                "recipe_id": str(row["recipe_id"]),
+                "user_id": row["user_id"],
+                "name": row["name"],
+                "description": row["description"],
+                "version": row["version"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "tags": json.loads(row["tags"]) if isinstance(row["tags"], str) else row["tags"],
+            }
+            for row in rows
+        ]
+
+    async def count_recipes(self, user_id: str) -> int:
+        """Count total recipes for a user."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            count = await conn.fetchval("SELECT COUNT(*) FROM recipes WHERE user_id = $1", user_id)
+
+        return count or 0
+
 
 # Global database instance
 _db: Database | None = None

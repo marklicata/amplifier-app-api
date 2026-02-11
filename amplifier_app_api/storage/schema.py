@@ -171,6 +171,33 @@ CREATE TRIGGER update_configuration_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 """
 
+# Recipes table - stores recipe definitions as JSON
+CREATE_RECIPES_TABLE = """
+CREATE TABLE IF NOT EXISTS recipes (
+    recipe_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
+    recipe_data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    tags JSONB DEFAULT '{}'::jsonb,
+
+    UNIQUE(user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes(user_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_name ON recipes(name);
+CREATE INDEX IF NOT EXISTS idx_recipes_tags ON recipes USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_recipes_recipe_data ON recipes USING GIN(recipe_data);
+
+DROP TRIGGER IF EXISTS update_recipes_updated_at ON recipes;
+CREATE TRIGGER update_recipes_updated_at
+    BEFORE UPDATE ON recipes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+"""
+
 # Complete schema initialization - executes in order
 INIT_SCHEMA = f"""
 -- Create helper functions
@@ -189,4 +216,5 @@ INIT_SCHEMA = f"""
 {CREATE_SESSIONS_TABLE}
 {CREATE_SESSION_PARTICIPANTS_TABLE}
 {CREATE_CONFIGURATION_TABLE}
+{CREATE_RECIPES_TABLE}
 """
