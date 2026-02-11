@@ -312,13 +312,13 @@ class TestCacheInvalidation:
         # Create config
         config = await manager.create_config(
             name="cache-test",
-            yaml_content="bundle:\n  name: test\n",
+            config_data={"bundle": {"name": "test", "version": "1.0.0"}},
         )
 
-        # Update YAML content
+        # Update config data
         await manager.update_config(
             config_id=config.config_id,
-            yaml_content="bundle:\n  name: test\n  version: 2.0.0\n",
+            config_data={"bundle": {"name": "test", "version": "2.0.0"}},
         )
 
         # Verify cache invalidation was called
@@ -338,10 +338,10 @@ class TestCacheInvalidation:
         # Create config
         config = await manager.create_config(
             name="metadata-test",
-            yaml_content="bundle:\n  name: test\n",
+            config_data={"bundle": {"name": "test", "version": "1.0.0"}},
         )
 
-        # Update only name and description (not YAML)
+        # Update only name and description (not config_data)
         await manager.update_config(
             config_id=config.config_id,
             name="updated-name",

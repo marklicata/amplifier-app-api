@@ -149,7 +149,27 @@ class TestE2EConfigEndpoints:
             f"{live_service}/configs",
             json={
                 "name": "test-config",
-                "yaml_content": "bundle:\n  name: test\n",
+                "config_data": {
+                    "bundle": {"name": "test", "version": "1.0.0"},
+                    "includes": [{"bundle": "foundation"}],
+                    "session": {
+                        "orchestrator": {
+                            "module": "loop-basic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                            "config": {}
+                        },
+                        "context": {
+                            "module": "context-simple",
+                            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                            "config": {}
+                        }
+                    },
+                    "providers": [{
+                        "module": "provider-anthropic",
+                        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                        "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                    }]
+                },
             },
             timeout=5.0,
         )
@@ -186,66 +206,6 @@ class TestE2EConfigEndpoints:
         assert response.status_code == 404
 
 
-@pytest.mark.e2e
-class TestE2EBundleEndpoints:
-    """Test all 5 bundle endpoints."""
-
-    def test_list_bundles(self, live_service):
-        """GET /bundles"""
-        response = httpx.get(f"{live_service}/bundles", timeout=5.0)
-        assert response.status_code == 200
-        data = response.json()
-        assert "bundles" in data
-
-    def test_add_bundle(self, live_service):
-        """POST /bundles"""
-        response = httpx.post(
-            f"{live_service}/bundles",
-            json={"source": "git+https://github.com/example/test-bundle"},
-            timeout=5.0,
-        )
-        assert response.status_code == 200
-
-    def test_get_bundle_404(self, live_service):
-        """GET /bundles/{name} - nonexistent"""
-        response = httpx.get(f"{live_service}/bundles/nonexistent", timeout=5.0)
-        assert response.status_code == 404
-
-    def test_delete_bundle_404(self, live_service):
-        """DELETE /bundles/{name} - nonexistent"""
-        response = httpx.delete(f"{live_service}/bundles/nonexistent", timeout=5.0)
-        assert response.status_code == 404
-
-    def test_activate_bundle_404(self, live_service):
-        """POST /bundles/{name}/activate - nonexistent"""
-        response = httpx.post(f"{live_service}/bundles/nonexistent/activate", timeout=5.0)
-        assert response.status_code == 404
-
-
-@pytest.mark.e2e
-class TestE2EToolEndpoints:
-    """Test all 3 tool endpoints."""
-
-    def test_list_tools(self, live_service):
-        """GET /tools"""
-        response = httpx.get(f"{live_service}/tools", timeout=30.0)
-        # May succeed or timeout if bundle loading is slow
-        assert response.status_code in [200, 500]
-
-    def test_get_tool_info_404(self, live_service):
-        """GET /tools/{name} - nonexistent tool"""
-        response = httpx.get(f"{live_service}/tools/nonexistent-tool", timeout=30.0)
-        assert response.status_code in [404, 500]
-
-    def test_invoke_tool(self, live_service):
-        """POST /tools/invoke"""
-        response = httpx.post(
-            f"{live_service}/tools/invoke",
-            json={"tool_name": "read_file", "parameters": {}},
-            timeout=30.0,
-        )
-        # Will likely fail without proper setup, but endpoint should exist
-        assert response.status_code in [200, 404, 500]
 
 
 @pytest.mark.e2e
@@ -281,7 +241,7 @@ class TestE2EErrorHandling:
 
     def test_405_wrong_method(self, live_service):
         """Test 405 for wrong HTTP method."""
-        response = httpx.get(f"{live_service}/configs", timeout=5.0)
+        response = httpx.put(f"{live_service}/sessions", timeout=5.0)
         assert response.status_code == 405
 
     def test_422_validation_error(self, live_service):
@@ -309,63 +269,54 @@ class TestE2ECompleteFlow:
     """Test a complete workflow if session creation works."""
 
     def test_create_config_list_flow(self, live_service):
-        """Test create provider → list providers → verify it's there."""
-        # Add a provider
+        """Test create config → list configs → verify it's there."""
+        # Create a config
         add_response = httpx.post(
-            f"{live_service}/config/providers",
-            json={"provider": "e2e-test-provider", "api_key": "test-key-123"},
-            timeout=5.0,
-        )
-        assert add_response.status_code == 200
-
-        # List providers
-        list_response = httpx.get(f"{live_service}/config/providers", timeout=5.0)
-        assert list_response.status_code == 200
-        providers = list_response.json()
-
-        # Verify it's in the list
-        provider_names = [p["name"] for p in providers]
-        assert "e2e-test-provider" in provider_names
-
-        # Get the specific provider
-        get_response = httpx.get(f"{live_service}/config/providers/e2e-test-provider", timeout=5.0)
-        assert get_response.status_code == 200
-        data = get_response.json()
-        assert data["name"] == "e2e-test-provider"
-        # API key should NOT be in response
-        assert "test-key-123" not in str(data)
-
-    def test_create_bundle_activate_flow(self, live_service):
-        """Test add bundle → list → activate → verify active."""
-        # Add a bundle
-        add_response = httpx.post(
-            f"{live_service}/bundles",
+            f"{live_service}/configs",
             json={
-                "source": "git+https://github.com/example/e2e-test-bundle",
-                "name": "e2e-test-bundle",
+                "name": "e2e-test-config",
+                "config_data": {
+                    "bundle": {"name": "e2e-test", "version": "1.0.0"},
+                    "includes": [{"bundle": "foundation"}],
+                    "session": {
+                        "orchestrator": {
+                            "module": "loop-basic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                            "config": {}
+                        },
+                        "context": {
+                            "module": "context-simple",
+                            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                            "config": {}
+                        }
+                    },
+                    "providers": [{
+                        "module": "provider-anthropic",
+                        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                        "config": {"api_key": "test-key-123", "model": "claude-sonnet-4-5"}
+                    }]
+                },
             },
             timeout=5.0,
         )
-        assert add_response.status_code == 200
+        assert add_response.status_code == 201
 
-        # List bundles
-        list_response = httpx.get(f"{live_service}/bundles", timeout=5.0)
+        config_id = add_response.json()["config_id"]
+
+        # List configs
+        list_response = httpx.get(f"{live_service}/configs", timeout=5.0)
         assert list_response.status_code == 200
-        data = list_response.json()
-        bundle_names = [b["name"] for b in data["bundles"]]
-        assert "e2e-test-bundle" in bundle_names
+        configs = list_response.json()
 
-        # Activate it
-        activate_response = httpx.post(
-            f"{live_service}/bundles/e2e-test-bundle/activate", timeout=5.0
-        )
-        assert activate_response.status_code in [200, 500]
+        # Verify it's in the list
+        config_ids = [c["config_id"] for c in configs["configs"]]
+        assert config_id in config_ids
 
-        # Verify it's active (if activation succeeded)
-        if activate_response.status_code == 200:
-            list_response2 = httpx.get(f"{live_service}/bundles", timeout=5.0)
-            data2 = list_response2.json()
-            assert data2["active"] == "e2e-test-bundle"
+        # Get the specific config
+        get_response = httpx.get(f"{live_service}/configs/{config_id}", timeout=5.0)
+        assert get_response.status_code == 200
+        data = get_response.json()
+        assert data["name"] == "e2e-test-config"
 
 
 @pytest.mark.e2e
@@ -405,7 +356,30 @@ class TestE2EEndpointCoverage:
     def test_all_config_endpoints_exist(self, live_service):
         """Verify all 5 config endpoints are accessible."""
         endpoints = [
-            ("POST", "/configs", {"name": "test", "yaml_content": "bundle:\n  name: test\n"}),
+            ("POST", "/configs", {
+                "name": "test",
+                "config_data": {
+                    "bundle": {"name": "test", "version": "1.0.0"},
+                    "includes": [{"bundle": "foundation"}],
+                    "session": {
+                        "orchestrator": {
+                            "module": "loop-basic",
+                            "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                            "config": {}
+                        },
+                        "context": {
+                            "module": "context-simple",
+                            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                            "config": {}
+                        }
+                    },
+                    "providers": [{
+                        "module": "provider-anthropic",
+                        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                        "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                    }]
+                }
+            }),
             ("GET", "/configs", None),
             ("GET", "/configs/test-id", None),
             ("PUT", "/configs/test-id", {"name": "updated"}),
@@ -432,48 +406,6 @@ class TestE2EEndpointCoverage:
 
             assert response.status_code != 405, f"Endpoint {method} {path} returned 405"
             assert response.status_code in [200, 201, 404, 422, 500]
-
-    def test_all_bundle_endpoints_exist(self, live_service):
-        """Verify all 5 bundle endpoints are accessible."""
-        endpoints = [
-            ("GET", "/bundles", None),
-            ("POST", "/bundles", {"source": "test"}),
-            ("GET", "/bundles/test", None),
-            ("DELETE", "/bundles/test", None),
-            ("POST", "/bundles/test/activate", None),
-        ]
-
-        for method, path, json_data in endpoints:
-            if method == "GET":
-                response = httpx.get(f"{live_service}{path}", timeout=5.0)
-            elif method == "POST":
-                response = httpx.post(
-                    f"{live_service}{path}",
-                    json=json_data if json_data else {},
-                    timeout=5.0,
-                )
-            elif method == "DELETE":
-                response = httpx.delete(f"{live_service}{path}", timeout=5.0)
-
-            assert response.status_code != 405, f"Endpoint {method} {path} returned 405"
-            assert response.status_code in [200, 404, 422, 500]
-
-    def test_all_tool_endpoints_exist(self, live_service):
-        """Verify all 3 tool endpoints are accessible."""
-        endpoints = [
-            ("GET", "/tools", None),
-            ("GET", "/tools/read_file", None),
-            ("POST", "/tools/invoke", {"tool_name": "test", "parameters": {}}),
-        ]
-
-        for method, path, json_data in endpoints:
-            if method == "GET":
-                response = httpx.get(f"{live_service}{path}", timeout=30.0)
-            elif method == "POST":
-                response = httpx.post(f"{live_service}{path}", json=json_data, timeout=30.0)
-
-            assert response.status_code != 405, f"Endpoint {method} {path} returned 405"
-            assert response.status_code in [200, 404, 422, 500]
 
     def test_all_health_endpoints_exist(self, live_service):
         """Verify all health endpoints are accessible."""

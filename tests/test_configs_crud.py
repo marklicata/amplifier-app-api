@@ -12,36 +12,62 @@ from httpx import ASGITransport, AsyncClient
 from amplifier_app_api.main import app
 
 
-# Sample YAML configs for testing
-MINIMAL_CONFIG_YAML = """
-bundle:
-  name: minimal-test-config
-  version: 1.0.0
-"""
+# Sample config data for testing
+MINIMAL_CONFIG_DATA = {
+    "bundle": {"name": "minimal-test-config", "version": "1.0.0"},
+    "includes": [{"bundle": "foundation"}],
+    "session": {
+        "orchestrator": {
+            "module": "loop-basic",
+            "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+            "config": {}
+        },
+        "context": {
+            "module": "context-simple",
+            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+            "config": {}
+        }
+    },
+    "providers": [{
+        "module": "provider-anthropic",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+        "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+    }]
+}
 
-COMPLETE_CONFIG_YAML = """
-bundle:
-  name: complete-test-config
-  version: 1.0.0
-  description: A complete test configuration
-
-includes:
-  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-
-providers:
-  - module: provider-anthropic
-    source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
-    config:
-      default_model: claude-sonnet-4-5-20250929
-      priority: 1
-
-tools:
-  - module: tool-filesystem
-  - module: tool-bash
-
-instructions:
-  You are a helpful AI assistant for testing purposes.
-"""
+COMPLETE_CONFIG_DATA = {
+    "bundle": {
+        "name": "complete-test-config",
+        "version": "1.0.0",
+        "description": "A complete test configuration"
+    },
+    "includes": [{"bundle": "git+https://github.com/microsoft/amplifier-foundation@main"}],
+    "session": {
+        "orchestrator": {
+            "module": "loop-streaming",
+            "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+            "config": {}
+        },
+        "context": {
+            "module": "context-persistent",
+            "source": "git+https://github.com/microsoft/amplifier-module-context-persistent@main",
+            "config": {}
+        }
+    },
+    "providers": [{
+        "module": "provider-anthropic",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+        "config": {
+            "default_model": "claude-sonnet-4-5-20250929",
+            "priority": 1
+        }
+    }],
+    "tools": [
+        {"module": "tool-filesystem"},
+        {"module": "tool-bash"}
+    ],
+    "instructions": "You are a helpful AI assistant for testing purposes."
+}
 
 
 @pytest.mark.asyncio
@@ -55,14 +81,14 @@ class TestConfigCRUD:
                 "/configs",
                 json={
                     "name": "test-minimal",
-                    "yaml_content": MINIMAL_CONFIG_YAML,
+                    "config_data": MINIMAL_CONFIG_DATA,
                 },
             )
             assert response.status_code == 201
             data = response.json()
             assert data["name"] == "test-minimal"
             assert data["config_id"] is not None
-            assert "bundle:" in data["yaml_content"]
+            assert "config_data" in data
             assert data["message"] == "Config created successfully"
 
     async def test_create_config_with_description_and_tags(self):
@@ -73,7 +99,7 @@ class TestConfigCRUD:
                 json={
                     "name": "test-with-metadata",
                     "description": "Test configuration with metadata",
-                    "yaml_content": MINIMAL_CONFIG_YAML,
+                    "config_data": MINIMAL_CONFIG_DATA,
                     "tags": {"env": "test", "team": "platform"},
                 },
             )
@@ -90,24 +116,25 @@ class TestConfigCRUD:
                 "/configs",
                 json={
                     "name": "invalid-config",
-                    "yaml_content": "providers:\n  - module: test\n",
+                    "config_data": {
+                        "providers": [{"module": "test"}]
+                    },
                 },
             )
             assert response.status_code == 400
             assert "bundle" in response.json()["detail"].lower()
 
-    async def test_create_config_invalid_yaml(self):
-        """Test that invalid YAML syntax is rejected."""
+    async def test_create_config_invalid_structure(self):
+        """Test that invalid config structure is rejected."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/configs",
                 json={
-                    "name": "bad-yaml",
-                    "yaml_content": "bundle:\n  name: test\n    invalid: indentation",
+                    "name": "bad-structure",
+                    "config_data": "not a dict",
                 },
             )
-            assert response.status_code == 400
-            assert "yaml" in response.json()["detail"].lower()
+            assert response.status_code == 422
 
     async def test_list_configs(self):
         """Test listing all configs."""
@@ -115,7 +142,7 @@ class TestConfigCRUD:
             # Create a config first
             await client.post(
                 "/configs",
-                json={"name": "list-test", "yaml_content": MINIMAL_CONFIG_YAML},
+                json={"name": "list-test", "config_data": MINIMAL_CONFIG_DATA},
             )
 
             # List configs
@@ -141,7 +168,7 @@ class TestConfigCRUD:
             # Create a config
             create_response = await client.post(
                 "/configs",
-                json={"name": "get-test", "yaml_content": MINIMAL_CONFIG_YAML},
+                json={"name": "get-test", "config_data": MINIMAL_CONFIG_DATA},
             )
             config_id = create_response.json()["config_id"]
 
@@ -164,22 +191,38 @@ class TestConfigCRUD:
             # Create a config
             create_response = await client.post(
                 "/configs",
-                json={"name": "update-test", "yaml_content": MINIMAL_CONFIG_YAML},
+                json={"name": "update-test", "config_data": MINIMAL_CONFIG_DATA},
             )
             config_id = create_response.json()["config_id"]
 
             # Update the config
-            new_yaml = """
-bundle:
-  name: updated-config
-  version: 2.0.0
-"""
+            new_config_data = {
+                "bundle": {"name": "updated-config", "version": "2.0.0"},
+                "includes": [{"bundle": "foundation"}],
+                "session": {
+                    "orchestrator": {
+                        "module": "loop-basic",
+                        "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+                        "config": {}
+                    },
+                    "context": {
+                        "module": "context-simple",
+                        "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                        "config": {}
+                    }
+                },
+                "providers": [{
+                    "module": "provider-anthropic",
+                    "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                    "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+                }]
+            }
             response = await client.put(
                 f"/configs/{config_id}",
                 json={
                     "name": "updated-name",
                     "description": "Updated description",
-                    "yaml_content": new_yaml,
+                    "config_data": new_config_data,
                     "tags": {"env": "production"},
                 },
             )
@@ -187,7 +230,7 @@ bundle:
             data = response.json()
             assert data["name"] == "updated-name"
             assert data["description"] == "Updated description"
-            assert "updated-config" in data["yaml_content"]
+            assert data["config_data"]["bundle"]["name"] == "updated-config"
             assert data["tags"]["env"] == "production"
 
     async def test_update_config_partial(self):
@@ -199,7 +242,7 @@ bundle:
                 json={
                     "name": "partial-update-test",
                     "description": "Original description",
-                    "yaml_content": MINIMAL_CONFIG_YAML,
+                    "config_data": MINIMAL_CONFIG_DATA,
                 },
             )
             config_id = create_response.json()["config_id"]
@@ -220,7 +263,7 @@ bundle:
             # Create a config
             create_response = await client.post(
                 "/configs",
-                json={"name": "delete-test", "yaml_content": MINIMAL_CONFIG_YAML},
+                json={"name": "delete-test", "config_data": MINIMAL_CONFIG_DATA},
             )
             config_id = create_response.json()["config_id"]
 
@@ -242,20 +285,19 @@ bundle:
 
 @pytest.mark.asyncio
 class TestConfigValidation:
-    """Test config YAML validation."""
+    """Test config data validation."""
 
-    async def test_yaml_must_be_dict(self):
-        """Test that YAML content must be a dictionary."""
+    async def test_config_data_must_be_dict(self):
+        """Test that config_data must be a dictionary."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/configs",
                 json={
-                    "name": "scalar-yaml",
-                    "yaml_content": "just a string",
+                    "name": "scalar-data",
+                    "config_data": "just a string",
                 },
             )
-            assert response.status_code == 400
-            assert "dictionary" in response.json()["detail"].lower()
+            assert response.status_code == 422
 
     async def test_bundle_section_required(self):
         """Test that bundle section is required."""
@@ -264,7 +306,9 @@ class TestConfigValidation:
                 "/configs",
                 json={
                     "name": "no-bundle",
-                    "yaml_content": "tools:\n  - module: test\n",
+                    "config_data": {
+                        "tools": [{"module": "test"}]
+                    },
                 },
             )
             assert response.status_code == 400
@@ -277,7 +321,9 @@ class TestConfigValidation:
                 "/configs",
                 json={
                     "name": "no-bundle-name",
-                    "yaml_content": "bundle:\n  version: 1.0.0\n",
+                    "config_data": {
+                        "bundle": {"version": "1.0.0"}
+                    },
                 },
             )
             assert response.status_code == 400
@@ -290,12 +336,10 @@ class TestConfigValidation:
                 "/configs",
                 json={
                     "name": "no-session",
-                    "yaml_content": """
-bundle:
-  name: test-config
-includes:
-  - bundle: foundation
-""",
+                    "config_data": {
+                        "bundle": {"name": "test-config", "version": "1.0.0"},
+                        "includes": [{"bundle": "foundation"}]
+                    },
                 },
             )
             # Should succeed - session can come from includes
@@ -311,63 +355,60 @@ class TestConfigEdgeCases:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/configs",
-                json={"name": "", "yaml_content": MINIMAL_CONFIG_YAML},
+                json={"name": "", "config_data": MINIMAL_CONFIG_DATA},
             )
             assert response.status_code == 422
 
-    async def test_create_config_missing_yaml(self):
-        """Test creating config without yaml_content."""
+    async def test_create_config_missing_data(self):
+        """Test creating config without config_data."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/configs",
-                json={"name": "missing-yaml"},
+                json={"name": "missing-data"},
             )
             assert response.status_code == 422
 
-    async def test_update_config_invalid_yaml(self):
-        """Test updating config with invalid YAML."""
+    async def test_update_config_invalid_structure(self):
+        """Test updating config with invalid structure."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Create a config
             create_response = await client.post(
                 "/configs",
-                json={"name": "update-invalid", "yaml_content": MINIMAL_CONFIG_YAML},
+                json={"name": "update-invalid", "config_data": MINIMAL_CONFIG_DATA},
             )
             config_id = create_response.json()["config_id"]
 
-            # Try to update with invalid YAML
+            # Try to update with invalid structure
             response = await client.put(
                 f"/configs/{config_id}",
-                json={"yaml_content": "invalid: yaml: syntax:"},
+                json={"config_data": {"bundle": {}}},  # Missing bundle.name
             )
             assert response.status_code == 400
 
-    async def test_very_large_yaml(self):
-        """Test config with large YAML content."""
+    async def test_very_large_config(self):
+        """Test config with large config data."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Create a large YAML with many tools
-            large_yaml = "bundle:\n  name: large-config\n\ntools:\n"
-            for i in range(100):
-                large_yaml += f"  - module: tool-{i}\n"
+            # Create a large config with many tools
+            large_config = MINIMAL_CONFIG_DATA.copy()
+            large_config["tools"] = [{"module": f"tool-{i}"} for i in range(100)]
 
             response = await client.post(
                 "/configs",
-                json={"name": "large-config", "yaml_content": large_yaml},
+                json={"name": "large-config", "config_data": large_config},
             )
             assert response.status_code == 201
 
     async def test_unicode_in_config(self):
         """Test config with unicode characters."""
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            unicode_yaml = """
-bundle:
-  name: unicode-config
-  description: "Configuration with emoji 🚀 and unicode: 你好"
-"""
+            unicode_config = MINIMAL_CONFIG_DATA.copy()
+            unicode_config["bundle"]["description"] = "Configuration with emoji 🚀 and unicode: 你好"
+
             response = await client.post(
                 "/configs",
-                json={"name": "unicode-test", "yaml_content": unicode_yaml},
+                json={"name": "unicode-test", "config_data": unicode_config},
             )
             assert response.status_code == 201
             data = response.json()
-            assert "🚀" in data["yaml_content"]
-            assert "你好" in data["yaml_content"]
+            assert "🚀" in data["config_data"]["bundle"]["description"]
+            assert "你好" in data["config_data"]["bundle"]["description"]

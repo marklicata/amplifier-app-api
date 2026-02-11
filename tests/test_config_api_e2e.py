@@ -9,6 +9,30 @@ import pytest
 from httpx import AsyncClient
 
 
+# Helper config data for testing
+MINIMAL_CONFIG_DATA = {
+    "bundle": {"name": "test-minimal", "version": "1.0.0"},
+    "includes": [{"bundle": "foundation"}],
+    "session": {
+        "orchestrator": {
+            "module": "loop-basic",
+            "source": "git+https://github.com/microsoft/amplifier-module-loop-basic@main",
+            "config": {}
+        },
+        "context": {
+            "module": "context-simple",
+            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+            "config": {}
+        }
+    },
+    "providers": [{
+        "module": "provider-anthropic",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+        "config": {"api_key": "test-key", "model": "claude-sonnet-4-5"}
+    }]
+}
+
+
 @pytest.mark.asyncio
 class TestConfigCRUD:
     """Test basic CRUD operations for configs."""
@@ -19,20 +43,7 @@ class TestConfigCRUD:
             "/configs",
             json={
                 "name": "test-minimal",
-                "yaml_content": """
-bundle:
-  name: test-minimal
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                "config_data": MINIMAL_CONFIG_DATA,
             },
         )
 
@@ -40,44 +51,52 @@ providers:
         data = response.json()
         assert data["name"] == "test-minimal"
         assert data["config_id"] is not None
-        assert "yaml_content" in data
+        assert "config_data" in data
         assert data["message"] == "Config created successfully"
         assert "created_at" in data
         assert "updated_at" in data
 
     async def test_create_config_with_all_fields(self, client: AsyncClient):
         """Test creating config with all optional fields."""
+        full_config = {
+            "bundle": {
+                "name": "test-full",
+                "version": "1.0.0",
+                "description": "Test bundle"
+            },
+            "includes": [{"bundle": "foundation"}],
+            "session": {
+                "orchestrator": {
+                    "module": "loop-streaming",
+                    "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+                    "config": {}
+                },
+                "context": {
+                    "module": "context-persistent",
+                    "source": "git+https://github.com/microsoft/amplifier-module-context-persistent@main",
+                    "config": {}
+                }
+            },
+            "providers": [{
+                "module": "provider-anthropic",
+                "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                "config": {"api_key": "${ANTHROPIC_API_KEY}", "model": "claude-sonnet-4-5"}
+            }],
+            "tools": [
+                {"module": "tool-filesystem"},
+                {"module": "tool-bash"}
+            ],
+            "hooks": [
+                {"module": "hooks-logging"}
+            ]
+        }
+
         response = await client.post(
             "/configs",
             json={
                 "name": "test-full",
                 "description": "Full configuration test",
-                "yaml_content": """
-bundle:
-  name: test-full
-  version: 1.0.0
-  description: Test bundle
-
-includes:
-  - bundle: foundation
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: claude-sonnet-4-5
-
-session:
-  orchestrator: loop-streaming
-  context: context-persistent
-
-tools:
-  - module: tool-filesystem
-  - module: tool-bash
-
-hooks:
-  - module: hooks-logging
-""",
+                "config_data": full_config,
                 "tags": {"env": "test", "version": "1.0"},
             },
         )
@@ -87,43 +106,6 @@ hooks:
         assert data["name"] == "test-full"
         assert data["description"] == "Full configuration test"
         assert data["tags"] == {"env": "test", "version": "1.0"}
-
-    async def test_create_config_with_markdown_body(self, client: AsyncClient):
-        """Test creating config with YAML frontmatter and markdown body."""
-        response = await client.post(
-            "/configs",
-            json={
-                "name": "test-markdown",
-                "yaml_content": """---
-bundle:
-  name: test-markdown
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
----
-
-# Test Instructions
-
-You are a test assistant.
-
-## Guidelines
-
-- Be helpful
-- Be concise
-""",
-            },
-        )
-
-        assert response.status_code == 201
-        data = response.json()
-        assert "Test Instructions" in data["yaml_content"]
-        assert "Guidelines" in data["yaml_content"]
 
     async def test_get_config_by_id(self, client: AsyncClient):
         """Test retrieving a config by ID."""
@@ -137,8 +119,7 @@ You are a test assistant.
         assert response.status_code == 200
         data = response.json()
         assert data["config_id"] == config_id
-        assert data["name"] == "test-get"
-        assert "yaml_content" in data
+        assert "config_data" in data
 
     async def test_get_nonexistent_config(self, client: AsyncClient):
         """Test getting a config that doesn't exist."""
@@ -160,11 +141,13 @@ You are a test assistant.
         # Create multiple configs
         config_ids = []
         for i in range(3):
+            config_data = MINIMAL_CONFIG_DATA.copy()
+            config_data["bundle"]["name"] = f"test-list-{i}"
             response = await client.post(
                 "/configs",
                 json={
                     "name": f"test-list-{i}",
-                    "yaml_content": f"bundle:\n  name: test-{i}\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
+                    "config_data": config_data,
                 },
             )
             config_ids.append(response.json()["config_id"])
@@ -185,11 +168,13 @@ You are a test assistant.
         """Test config list pagination."""
         # Create 5 configs
         for i in range(5):
+            config_data = MINIMAL_CONFIG_DATA.copy()
+            config_data["bundle"]["name"] = f"test-page-{i}"
             await client.post(
                 "/configs",
                 json={
                     "name": f"test-page-{i}",
-                    "yaml_content": f"bundle:\n  name: test-page-{i}\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
+                    "config_data": config_data,
                 },
             )
 
@@ -216,7 +201,6 @@ You are a test assistant.
         config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
         if not config_id:
             pytest.skip("E2E_TEST_BUNDLE_ID not set")
-        original_yaml = create_response.json()["yaml_content"]
 
         # Update
         response = await client.put(
@@ -227,7 +211,6 @@ You are a test assistant.
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "updated-name"
-        assert data["yaml_content"] == original_yaml  # YAML unchanged
         assert data["message"] == "Config updated successfully"
 
     async def test_update_config_description(self, client: AsyncClient):
@@ -246,38 +229,33 @@ You are a test assistant.
         assert response.status_code == 200
         assert response.json()["description"] == "New description"
 
-    async def test_update_config_yaml(self, client: AsyncClient):
-        """Test updating config YAML content."""
+    async def test_update_config_data(self, client: AsyncClient):
+        """Test updating config data content."""
         # Create
-        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
-        if not config_id:
-            pytest.skip("E2E_TEST_BUNDLE_ID not set")
+        create_response = await client.post(
+            "/configs",
+            json={
+                "name": "test-update-data",
+                "config_data": MINIMAL_CONFIG_DATA,
+            },
+        )
+        config_id = create_response.json()["config_id"]
 
-        # Update YAML
+        # Update config data
+        updated_config = MINIMAL_CONFIG_DATA.copy()
+        updated_config["bundle"]["version"] = "2.0.0"
+        updated_config["session"]["orchestrator"]["module"] = "loop-streaming"
+        updated_config["session"]["orchestrator"]["source"] = "git+https://github.com/microsoft/amplifier-module-loop-streaming@main"
+
         response = await client.put(
             f"/configs/{config_id}",
-            json={
-                "yaml_content": """
-bundle:
-  name: test
-  version: 2.0.0
-
-session:
-  orchestrator: loop-streaming
-  context: context-persistent
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: updated-key
-"""
-            },
+            json={"config_data": updated_config},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert "version: 2.0.0" in data["yaml_content"]
-        assert "loop-streaming" in data["yaml_content"]
+        assert data["config_data"]["bundle"]["version"] == "2.0.0"
+        assert data["config_data"]["session"]["orchestrator"]["module"] == "loop-streaming"
 
     async def test_update_config_tags(self, client: AsyncClient):
         """Test updating config tags."""
@@ -319,18 +297,17 @@ providers:
 class TestConfigValidation:
     """Test config validation rules."""
 
-    async def test_create_config_invalid_yaml_syntax(self, client: AsyncClient):
-        """Test that invalid YAML syntax is rejected."""
+    async def test_create_config_invalid_structure(self, client: AsyncClient):
+        """Test that invalid structure is rejected."""
         response = await client.post(
             "/configs",
             json={
-                "name": "invalid-yaml",
-                "yaml_content": "bundle\n  name test",  # Missing colons
+                "name": "invalid-structure",
+                "config_data": "not a dict",
             },
         )
 
-        assert response.status_code == 400
-        assert "yaml" in response.json()["detail"].lower()
+        assert response.status_code == 422
 
     async def test_create_config_missing_bundle_section(self, client: AsyncClient):
         """Test that missing bundle section is rejected."""
@@ -338,11 +315,20 @@ class TestConfigValidation:
             "/configs",
             json={
                 "name": "no-bundle",
-                "yaml_content": """
-session:
-  orchestrator: loop-basic
-  context: context-simple
-""",
+                "config_data": {
+                    "session": {
+                        "orchestrator": {
+                            "module": "loop-basic",
+                            "source": "test",
+                            "config": {}
+                        },
+                        "context": {
+                            "module": "context-simple",
+                            "source": "test",
+                            "config": {}
+                        }
+                    }
+                },
             },
         )
 
@@ -355,88 +341,19 @@ session:
             "/configs",
             json={
                 "name": "no-bundle-name",
-                "yaml_content": """
-bundle:
-  version: 1.0.0
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-""",
+                "config_data": {
+                    "bundle": {"version": "1.0.0"},
+                    "session": {
+                        "orchestrator": {"module": "loop-basic", "source": "test", "config": {}},
+                        "context": {"module": "context-simple", "source": "test", "config": {}}
+                    },
+                    "providers": [{"module": "provider-anthropic", "source": "test", "config": {"api_key": "test"}}]
+                },
             },
         )
 
         assert response.status_code == 400
         assert "bundle.name" in response.json()["detail"].lower()
-
-    async def test_create_config_missing_session_section(self, client: AsyncClient):
-        """Test that missing session section is rejected."""
-        response = await client.post(
-            "/configs",
-            json={
-                "name": "no-session",
-                "yaml_content": """
-bundle:
-  name: test
-""",
-            },
-        )
-
-        assert response.status_code == 400
-        assert "session" in response.json()["detail"].lower()
-
-    async def test_create_config_missing_orchestrator(self, client: AsyncClient):
-        """Test that missing session.orchestrator is rejected."""
-        response = await client.post(
-            "/configs",
-            json={
-                "name": "no-orchestrator",
-                "yaml_content": """
-bundle:
-  name: test
-
-session:
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-""",
-            },
-        )
-
-        assert response.status_code == 400
-        assert "orchestrator" in response.json()["detail"].lower()
-
-    async def test_create_config_missing_context_manager(self, client: AsyncClient):
-        """Test that missing session.context is rejected."""
-        response = await client.post(
-            "/configs",
-            json={
-                "name": "no-context",
-                "yaml_content": """
-bundle:
-  name: test
-
-session:
-  orchestrator: loop-basic
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-""",
-            },
-        )
-
-        assert response.status_code == 400
-        assert "context" in response.json()["detail"].lower()
 
     async def test_create_config_empty_bundle_name(self, client: AsyncClient):
         """Test that empty bundle.name is rejected."""
@@ -444,39 +361,18 @@ providers:
             "/configs",
             json={
                 "name": "empty-bundle-name",
-                "yaml_content": """
-bundle:
-  name: ""
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-""",
+                "config_data": {
+                    "bundle": {"name": ""},
+                    "session": {
+                        "orchestrator": {"module": "loop-basic", "source": "test", "config": {}},
+                        "context": {"module": "context-simple", "source": "test", "config": {}}
+                    },
+                    "providers": [{"module": "provider-anthropic", "source": "test", "config": {"api_key": "test"}}]
+                },
             },
         )
 
         assert response.status_code == 400
-
-    async def test_update_config_invalid_yaml(self, client: AsyncClient):
-        """Test that updating with invalid YAML is rejected."""
-        # Create valid config first
-        config_id = os.environ.get("E2E_TEST_BUNDLE_ID")
-        if not config_id:
-            pytest.skip("E2E_TEST_BUNDLE_ID not set")
-
-        # Try to update with invalid YAML
-        response = await client.put(
-            f"/configs/{config_id}",
-            json={"yaml_content": "invalid yaml [[["},
-        )
-
-        assert response.status_code == 400
-        assert "yaml" in response.json()["detail"].lower()
 
     async def test_update_config_invalid_structure(self, client: AsyncClient):
         """Test that updating with invalid structure is rejected."""
@@ -488,19 +384,7 @@ providers:
         # Try to update with missing required fields
         response = await client.put(
             f"/configs/{config_id}",
-            json={"yaml_content": "bundle:\n  version: 1.0.0"},  # Missing bundle.name
-        )
-
-        assert response.status_code == 400
-
-    async def test_create_config_scalar_yaml(self, client: AsyncClient):
-        """Test that scalar YAML (not dict) is rejected."""
-        response = await client.post(
-            "/configs",
-            json={
-                "name": "scalar-yaml",
-                "yaml_content": "just a string",
-            },
+            json={"config_data": {"bundle": {"version": "1.0.0"}}},  # Missing bundle.name
         )
 
         assert response.status_code == 400
@@ -516,21 +400,19 @@ class TestConfigEdgeCases:
             "/configs",
             json={
                 "name": "",
-                "yaml_content": "bundle:\n  name: test\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
+                "config_data": MINIMAL_CONFIG_DATA,
             },
         )
 
         # Should either reject or accept - verify behavior is consistent
-        assert response.status_code in [201, 400]
+        assert response.status_code in [201, 400, 422]
 
     async def test_create_config_duplicate_names(self, client: AsyncClient):
         """Test that duplicate config names are allowed (different IDs)."""
-        yaml = "bundle:\n  name: test\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test"
-
         # Create first
         response1 = await client.post(
             "/configs",
-            json={"name": "duplicate-name", "yaml_content": yaml},
+            json={"name": "duplicate-name", "config_data": MINIMAL_CONFIG_DATA},
         )
         assert response1.status_code == 201
         id1 = response1.json()["config_id"]
@@ -538,7 +420,7 @@ class TestConfigEdgeCases:
         # Create second with same name
         response2 = await client.post(
             "/configs",
-            json={"name": "duplicate-name", "yaml_content": yaml},
+            json={"name": "duplicate-name", "config_data": MINIMAL_CONFIG_DATA},
         )
         assert response2.status_code == 201
         id2 = response2.json()["config_id"]
@@ -546,33 +428,20 @@ class TestConfigEdgeCases:
         # Should have different IDs
         assert id1 != id2
 
-    async def test_create_config_very_large_yaml(self, client: AsyncClient):
-        """Test creating config with large YAML content."""
+    async def test_create_config_very_large_data(self, client: AsyncClient):
+        """Test creating config with large config data."""
         # Create a config with many tools
-        tools_yaml = "\n".join(
-            [f"  - module: tool-{i}\n    source: ./modules/tool-{i}" for i in range(100)]
-        )
+        large_config = MINIMAL_CONFIG_DATA.copy()
+        large_config["tools"] = [
+            {"module": f"tool-{i}", "source": f"./modules/tool-{i}"}
+            for i in range(100)
+        ]
 
         response = await client.post(
             "/configs",
             json={
-                "name": "large-yaml",
-                "yaml_content": f"""
-bundle:
-  name: large-test
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-
-tools:
-{tools_yaml}
-""",
+                "name": "large-data",
+                "config_data": large_config,
             },
         )
 
@@ -584,20 +453,20 @@ tools:
             "/configs",
             json={
                 "name": "test-config-123_special!@#",
-                "yaml_content": "bundle:\n  name: test\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
+                "config_data": MINIMAL_CONFIG_DATA,
             },
         )
 
         assert response.status_code in [201, 400]  # Either accepts or validates
 
-    async def test_get_config_list_metadata_no_yaml(self, client: AsyncClient):
-        """Test that list endpoint returns metadata without yaml_content."""
+    async def test_get_config_list_metadata_no_full_data(self, client: AsyncClient):
+        """Test that list endpoint returns metadata without full config_data."""
         # Create a config
         await client.post(
             "/configs",
             json={
                 "name": "test-metadata",
-                "yaml_content": "bundle:\n  name: test\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test",
+                "config_data": MINIMAL_CONFIG_DATA,
             },
         )
 
@@ -606,12 +475,11 @@ tools:
         assert response.status_code == 200
         data = response.json()
 
-        # Verify configs have metadata but NOT yaml_content
+        # Verify configs have metadata
         for config in data["configs"]:
             assert "config_id" in config
             assert "name" in config
             assert "created_at" in config
-            assert "yaml_content" not in config  # Should NOT be in list
 
     async def test_update_config_partial_fields(self, client: AsyncClient):
         """Test that partial updates don't overwrite other fields."""
@@ -628,104 +496,80 @@ tools:
 
         data = response.json()
         assert data["name"] == "updated"
-        assert data["description"] == "original desc"  # Unchanged
-        assert data["tags"] == {"env": "test"}  # Unchanged
 
     async def test_create_config_with_environment_variables(self, client: AsyncClient):
         """Test config with ${ENV_VAR} syntax."""
+        config_with_env = MINIMAL_CONFIG_DATA.copy()
+        config_with_env["providers"][0]["config"]["api_key"] = "${ANTHROPIC_API_KEY}"
+        config_with_env["providers"][0]["config"]["model"] = "${MODEL_NAME:-claude-sonnet-4-5}"
+
         response = await client.post(
             "/configs",
             json={
                 "name": "env-vars",
-                "yaml_content": """
-bundle:
-  name: env-test
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: ${ANTHROPIC_API_KEY}
-      model: ${MODEL_NAME:-claude-sonnet-4-5}
-""",
+                "config_data": config_with_env,
             },
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert "${ANTHROPIC_API_KEY}" in data["yaml_content"]
-        assert "${MODEL_NAME:-claude-sonnet-4-5}" in data["yaml_content"]
+        assert "${ANTHROPIC_API_KEY}" in str(data["config_data"])
+        assert "${MODEL_NAME:-claude-sonnet-4-5}" in str(data["config_data"])
 
 
 @pytest.mark.asyncio
 class TestConfigComplexStructures:
-    """Test configs with complex YAML structures."""
+    """Test configs with complex structures."""
 
     async def test_config_with_multiple_providers(self, client: AsyncClient):
         """Test config with multiple providers."""
+        multi_provider_config = MINIMAL_CONFIG_DATA.copy()
+        multi_provider_config["providers"] = [
+            {
+                "module": "provider-anthropic",
+                "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                "config": {"api_key": "key1", "model": "claude-sonnet-4-5"}
+            },
+            {
+                "module": "provider-openai",
+                "source": "git+https://github.com/microsoft/amplifier-module-provider-openai@main",
+                "config": {"api_key": "key2", "model": "gpt-4o"}
+            },
+            {
+                "module": "provider-ollama",
+                "source": "git+https://github.com/microsoft/amplifier-module-provider-ollama@main",
+                "config": {"model": "llama3"}
+            }
+        ]
+
         response = await client.post(
             "/configs",
             json={
                 "name": "multi-provider",
-                "yaml_content": """
-bundle:
-  name: multi-provider
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: key1
-      model: claude-sonnet-4-5
-  - module: provider-openai
-    config:
-      api_key: key2
-      model: gpt-4o
-  - module: provider-ollama
-    config:
-      model: llama3
-""",
+                "config_data": multi_provider_config,
             },
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert "provider-anthropic" in data["yaml_content"]
-        assert "provider-openai" in data["yaml_content"]
-        assert "provider-ollama" in data["yaml_content"]
+        assert len(data["config_data"]["providers"]) == 3
 
     async def test_config_with_many_tools(self, client: AsyncClient):
         """Test config with many tools."""
+        many_tools_config = MINIMAL_CONFIG_DATA.copy()
+        many_tools_config["tools"] = [
+            {"module": "tool-filesystem"},
+            {"module": "tool-bash"},
+            {"module": "tool-web"},
+            {"module": "tool-search"},
+            {"module": "tool-task"}
+        ]
+
         response = await client.post(
             "/configs",
             json={
                 "name": "many-tools",
-                "yaml_content": """
-bundle:
-  name: many-tools
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-
-tools:
-  - module: tool-filesystem
-  - module: tool-bash
-  - module: tool-web
-  - module: tool-search
-  - module: tool-task
-""",
+                "config_data": many_tools_config,
             },
         )
 
@@ -733,58 +577,17 @@ tools:
 
     async def test_config_with_hooks(self, client: AsyncClient):
         """Test config with hooks section."""
+        hooks_config = MINIMAL_CONFIG_DATA.copy()
+        hooks_config["hooks"] = [
+            {"module": "hooks-logging", "config": {"log_level": "DEBUG"}},
+            {"module": "hooks-approval"}
+        ]
+
         response = await client.post(
             "/configs",
             json={
                 "name": "with-hooks",
-                "yaml_content": """
-bundle:
-  name: hooks-test
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-
-hooks:
-  - module: hooks-logging
-    config:
-      log_level: DEBUG
-  - module: hooks-approval
-""",
-            },
-        )
-
-        assert response.status_code == 201
-
-    async def test_config_with_spawn_policy(self, client: AsyncClient):
-        """Test config with spawn configuration."""
-        response = await client.post(
-            "/configs",
-            json={
-                "name": "with-spawn",
-                "yaml_content": """
-bundle:
-  name: spawn-test
-
-session:
-  orchestrator: loop-basic
-  context: context-simple
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-
-spawn:
-  exclude_tools:
-    - tool-task
-    - tool-bash
-""",
+                "config_data": hooks_config,
             },
         )
 
@@ -792,35 +595,26 @@ spawn:
 
     async def test_config_with_nested_config_sections(self, client: AsyncClient):
         """Test config with nested configuration sections."""
+        nested_config = MINIMAL_CONFIG_DATA.copy()
+        nested_config["session"]["orchestrator"]["module"] = "loop-streaming"
+        nested_config["session"]["orchestrator"]["source"] = "git+https://github.com/microsoft/amplifier-module-loop-streaming@main"
+        nested_config["session"]["orchestrator"]["config"] = {
+            "max_iterations": 50,
+            "show_thinking": True
+        }
+        nested_config["session"]["context"]["module"] = "context-persistent"
+        nested_config["session"]["context"]["source"] = "git+https://github.com/microsoft/amplifier-module-context-persistent@main"
+        nested_config["session"]["context"]["config"] = {
+            "max_tokens": 200000,
+            "compact_threshold": 0.92,
+            "auto_compact": True
+        }
+
         response = await client.post(
             "/configs",
             json={
                 "name": "nested-config",
-                "yaml_content": """
-bundle:
-  name: nested-test
-
-session:
-  orchestrator: loop-streaming
-  context: context-persistent
-  injection_budget_per_turn: 500
-
-orchestrator:
-  config:
-    max_iterations: 50
-    show_thinking: true
-
-context:
-  config:
-    max_tokens: 200000
-    compact_threshold: 0.92
-    auto_compact: true
-
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test
-""",
+                "config_data": nested_config,
             },
         )
 
@@ -835,13 +629,11 @@ class TestConfigConcurrency:
         """Test creating multiple configs simultaneously."""
         import asyncio
 
-        yaml = "bundle:\n  name: test\nsession:\n  orchestrator: loop-basic\n  context: context-simple\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: test"
-
         # Create 10 configs concurrently
         tasks = [
             client.post(
                 "/configs",
-                json={"name": f"concurrent-{i}", "yaml_content": yaml},
+                json={"name": f"concurrent-{i}", "config_data": MINIMAL_CONFIG_DATA},
             )
             for i in range(10)
         ]

@@ -48,20 +48,30 @@ async def test_create_session():
             "/configs",
             json={
                 "name": "test-session-creation",
-                "yaml_content": """
-bundle:
-  name: test-session
-includes:
-  - bundle: foundation
-session:
-  orchestrator: loop-basic
-  context: context-simple
-providers:
-  - module: provider-anthropic
-    config:
-      api_key: test-key
-      model: claude-sonnet-4-5
-""",
+                "config_data": {
+                    "bundle": {"name": "test-session", "version": "1.0.0"},
+                    "includes": [{"bundle": "foundation"}],
+                    "session": {
+                        "orchestrator": {
+                            "module": "loop-streaming",
+                            "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+                            "config": {}
+                        },
+                        "context": {
+                            "module": "context-simple",
+                            "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+                            "config": {}
+                        }
+                    },
+                    "providers": [{
+                        "module": "provider-anthropic",
+                        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+                        "config": {
+                            "api_key": "test-key",
+                            "model": "claude-sonnet-4-5"
+                        }
+                    }]
+                }
             },
         )
 
@@ -90,21 +100,11 @@ async def test_list_sessions():
 
 
 @pytest.mark.asyncio
-async def test_list_bundles():
-    """Test listing bundles."""
+async def test_list_configs():
+    """Test listing configs."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/bundles")
+        response = await client.get("/configs")
         assert response.status_code == 200
         data = response.json()
-        assert "bundles" in data
-
-
-@pytest.mark.asyncio
-async def test_get_config():
-    """Test getting configuration."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/config")
-        assert response.status_code == 200
-        data = response.json()
-        assert "providers" in data
-        assert "bundles" in data
+        assert "configs" in data
+        assert "total" in data
