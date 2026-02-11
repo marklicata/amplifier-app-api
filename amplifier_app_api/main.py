@@ -11,12 +11,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from .api import (
     applications_router,
-    bundles_router,
     config_router,
     health_router,
-    providers_router,
     sessions_router,
-    tools_router,
 )
 from .config import settings
 from .middleware.auth import AuthMiddleware
@@ -78,11 +75,13 @@ REST API service for Amplifier AI development platform.
 The API is built around two core primitives:
 
 ### Configs
-Complete YAML bundles that define everything needed to run an Amplifier session:
-- Tools, providers, hooks
+Complete bundle configurations defining everything needed to run an Amplifier session:
+- Bundle metadata (name, version, description)
+- Included bundles
 - Session configuration (orchestrator, context manager)
-- Agents, spawn policies
-- All includes and dependencies
+- Providers, tools, and hooks
+- Agents and context mappings
+- System instructions and base paths
 
 Configs are **reusable** - create once, use for multiple sessions.
 
@@ -92,21 +91,48 @@ Lightweight runtime instances that reference a Config:
 - Maintains conversation transcript
 - Tracks status and metadata
 
-## Typical Flow
+## Typical Workflow
 
-1. Create a Config with your YAML bundle → Get config_id
-2. Create Session(s) from config_id → Get session_id
-3. Send messages to session_id → Get AI responses
+1. **Build** a config using your app (validate with `POST /api/configs/validate`)
+2. **Save** the config → Get config_id
+3. **Create** session(s) from config_id → Get session_id
+4. **Send** messages to session_id → Get AI responses
 
 ## Key Features
 
-- **Config Reusability**: One config → unlimited sessions
-- **Bundle Caching**: Prepared bundles cached for fast session creation
-- **Programmatic Helpers**: Add tools/providers/bundles via API
-- **Type Safety**: Full Pydantic validation
-- **Cache Invalidation**: Automatic when configs are updated
+- ✅ **Config Validation**: Validate configs before saving
+- ✅ **Config Reusability**: One config → unlimited sessions
+- ✅ **Bundle Caching**: Prepared bundles cached for fast session creation
+- ✅ **Type Safety**: Full Pydantic validation
+- ✅ **Cache Invalidation**: Automatic when configs are updated
+
+## API Endpoints
+
+### Application Management
+- `POST /api/applications` - Register application
+- `GET /api/applications` - List applications
+- `DELETE /api/applications/{id}` - Delete application
+
+### Config Management
+- `GET /api/configs` - List configs
+- `POST /api/configs` - Create config
+- `GET /api/configs/{id}` - Get config
+- `PUT /api/configs/{id}` - Update config
+- `DELETE /api/configs/{id}` - Delete config
+- `POST /api/configs/validate` - Validate config (no save)
+
+### Session Management
+- `GET /api/sessions` - List sessions
+- `POST /api/sessions` - Create session
+- `GET /api/sessions/{id}` - Get session
+- `POST /api/sessions/{id}/send` - Send message
+- `DELETE /api/sessions/{id}` - Delete session
+
+### Health & Diagnostics
+- `GET /api/health` - Health check
+- `GET /api/smoke` - Smoke test suite
 """,
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -140,9 +166,6 @@ app.include_router(health_router)
 app.include_router(applications_router)
 app.include_router(sessions_router)
 app.include_router(config_router)
-app.include_router(bundles_router)
-app.include_router(tools_router)
-app.include_router(providers_router)
 
 # Import and register smoke tests router (after app is defined to avoid circular import)
 from .api.smoke import router as smoke_router  # noqa: E402

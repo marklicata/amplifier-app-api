@@ -101,9 +101,7 @@ class Database:
             raise RuntimeError("Database not connected")
 
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM sessions WHERE session_id = $1", session_id
-            )
+            row = await conn.fetchrow("SELECT * FROM sessions WHERE session_id = $1", session_id)
 
         if row:
             return {
@@ -117,8 +115,12 @@ class Database:
                 "updated_at": row["updated_at"],
                 "last_accessed_at": row["last_accessed_at"],
                 "message_count": row["message_count"],
-                "transcript": json.loads(row["transcript"]) if isinstance(row["transcript"], str) else row["transcript"],
-                "metadata": json.loads(row["metadata"]) if isinstance(row["metadata"], str) else row["metadata"],
+                "transcript": json.loads(row["transcript"])
+                if isinstance(row["transcript"], str)
+                else row["transcript"],
+                "metadata": json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else row["metadata"],
             }
         return None
 
@@ -209,9 +211,7 @@ class Database:
         cutoff = datetime.now(UTC) - timedelta(days=days)
 
         async with self._pool.acquire() as conn:
-            result = await conn.execute(
-                "DELETE FROM sessions WHERE updated_at < $1", cutoff
-            )
+            result = await conn.execute("DELETE FROM sessions WHERE updated_at < $1", cutoff)
 
         # Extract count from result string "DELETE N"
         deleted = int(result.split()[-1]) if result else 0
@@ -292,9 +292,7 @@ class Database:
 
         return [dict(row) for row in rows]
 
-    async def update_participant_role(
-        self, session_id: str, user_id: str, role: str
-    ) -> None:
+    async def update_participant_role(self, session_id: str, user_id: str, role: str) -> None:
         """Update a participant's role."""
         if not self._pool:
             raise RuntimeError("Database not connected")
@@ -318,9 +316,10 @@ class Database:
         self,
         config_id: str,
         name: str,
-        yaml_content: str,
+        config_json: str,
         description: str | None = None,
         tags: dict[str, str] | None = None,
+        user_id: str | None = None,
     ) -> None:
         """Create a new config."""
         if not self._pool:
@@ -330,14 +329,15 @@ class Database:
             await conn.execute(
                 """
                 INSERT INTO configs (
-                    config_id, name, description, yaml_content, tags
+                    config_id, name, description, config_json, user_id, tags
                 )
-                VALUES ($1, $2, $3, $4, $5::jsonb)
+                VALUES ($1, $2, $3, $4, $5, $6::jsonb)
                 """,
                 config_id,
                 name,
                 description,
-                yaml_content,
+                config_json,
+                user_id,
                 json.dumps(tags or {}),  # Convert dict to JSON string for JSONB
             )
 
@@ -349,16 +349,15 @@ class Database:
             raise RuntimeError("Database not connected")
 
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM configs WHERE config_id = $1", config_id
-            )
+            row = await conn.fetchrow("SELECT * FROM configs WHERE config_id = $1", config_id)
 
         if row:
             return {
                 "config_id": row["config_id"],
                 "name": row["name"],
                 "description": row["description"],
-                "yaml_content": row["yaml_content"],
+                "config_json": row["config_json"],
+                "user_id": row["user_id"],
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
                 "tags": json.loads(row["tags"]) if isinstance(row["tags"], str) else row["tags"],
@@ -375,9 +374,10 @@ class Database:
         param_idx = 1
 
         for key, value in kwargs.items():
-            if key == "tags":
+            if key in ("tags", "config_json"):
+                # config_json is already a JSON string, but we need to cast it to jsonb
                 updates.append(f"{key} = ${param_idx}::jsonb")
-                params.append(json.dumps(value))
+                params.append(json.dumps(value) if key == "tags" else value)
             else:
                 updates.append(f"{key} = ${param_idx}")
                 params.append(value)
@@ -411,7 +411,7 @@ class Database:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT config_id, name, description, created_at, updated_at, tags
+                SELECT config_id, name, description, user_id, created_at, updated_at, tags
                 FROM configs
                 ORDER BY updated_at DESC
                 LIMIT $1 OFFSET $2
@@ -425,6 +425,7 @@ class Database:
                 "config_id": row["config_id"],
                 "name": row["name"],
                 "description": row["description"],
+                "user_id": row["user_id"],
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
                 "tags": json.loads(row["tags"]) if isinstance(row["tags"], str) else row["tags"],
@@ -449,9 +450,7 @@ class Database:
             raise RuntimeError("Database not connected")
 
         async with self._pool.acquire() as conn:
-            value = await conn.fetchval(
-                "SELECT value FROM configuration WHERE key = $1", key
-            )
+            value = await conn.fetchval("SELECT value FROM configuration WHERE key = $1", key)
 
         if value:
             return json.loads(value) if isinstance(value, str) else value

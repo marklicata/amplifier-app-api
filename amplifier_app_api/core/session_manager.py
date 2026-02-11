@@ -150,6 +150,7 @@ class SessionManager:
             foundation_source = self._bundle_sources["foundation"]
 
             # Load and prepare foundation bundle to make modules globally available
+            # Note: install_deps=False because foundation is pre-installed via pyproject.toml
             foundation_bundle = await self.registry.load(foundation_source)
             await foundation_bundle.prepare(install_deps=False)
 
@@ -187,31 +188,15 @@ class SessionManager:
             raise ValueError(f"Config not found: {config_id}")
 
         try:
-            # Parse YAML string to dict
-            config_dict = self.config_manager.parse_yaml(config.yaml_content)
-            logger.info(f"Parsed YAML for config: {config_id}")
-
-            # Extract markdown body if present (after YAML frontmatter)
-            # Config YAML can be:
-            # 1. Pure YAML (no frontmatter separator)
-            # 2. YAML frontmatter + markdown body (separated by "---")
-            instruction = None
-            if config.yaml_content.startswith("---"):
-                # Has frontmatter - extract markdown body
-                parts = config.yaml_content.split("---", 2)
-                if len(parts) > 2:
-                    instruction = parts[2].strip()
+            # config.config_data is already a dict - no parsing needed!
+            config_dict = config.config_data
+            logger.info(f"Using config data for config: {config_id}")
 
             # Import Bundle class
             from amplifier_foundation import Bundle  # type: ignore[import-not-found]
 
-            # Create Bundle from dict (no temp file needed!)
+            # Create Bundle from dict directly
             bundle = Bundle.from_dict(config_dict, base_path=Path.cwd())
-
-            # Set instruction (markdown body) if present
-            if instruction:
-                bundle.instruction = instruction
-
             logger.info(f"Created Bundle from config dict: {config_id}")
 
             # Create source resolver that uses our registry for resolving includes

@@ -11,13 +11,13 @@ END;
 $$ LANGUAGE plpgsql;
 """
 
-# Configs table - stores YAML bundle configurations
+# Configs table - stores JSON bundle configurations (without user_id initially)
 CREATE_CONFIGS_TABLE = """
 CREATE TABLE IF NOT EXISTS configs (
     config_id TEXT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    yaml_content TEXT NOT NULL,
+    config_json JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     tags JSONB DEFAULT '{}'::jsonb
@@ -26,11 +26,46 @@ CREATE TABLE IF NOT EXISTS configs (
 CREATE INDEX IF NOT EXISTS idx_configs_name ON configs(name);
 CREATE INDEX IF NOT EXISTS idx_configs_created_at ON configs(created_at);
 CREATE INDEX IF NOT EXISTS idx_configs_tags ON configs USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
 
 DROP TRIGGER IF EXISTS update_configs_updated_at ON configs;
 CREATE TRIGGER update_configs_updated_at
     BEFORE UPDATE ON configs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+"""
+
+# Migration: Add user_id column to existing configs table if it doesn't exist
+MIGRATE_CONFIGS_ADD_USER_ID = """
+DO $$
+BEGIN
+    -- Add user_id column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'configs' AND column_name = 'user_id'
+    ) THEN
+        ALTER TABLE configs ADD COLUMN user_id TEXT REFERENCES users(user_id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_configs_user_id ON configs(user_id);
+    END IF;
+END $$;
+"""
+
+# Migration: Rename yaml_content to config_json and convert to JSONB
+MIGRATE_CONFIGS_YAML_TO_JSON = """
+DO $$
+BEGIN
+    -- Check if yaml_content column exists (old schema)
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'configs' AND column_name = 'yaml_content'
+    ) THEN
+        -- Rename column and convert to JSONB (this will fail if data isn't valid JSON)
+        ALTER TABLE configs RENAME COLUMN yaml_content TO config_json;
+        ALTER TABLE configs ALTER COLUMN config_json TYPE JSONB USING config_json::jsonb;
+
+        -- Add GIN index for config_json
+        CREATE INDEX IF NOT EXISTS idx_configs_config_json ON configs USING GIN(config_json);
+    END IF;
+END $$;
 """
 
 # Applications table - API key authentication for multi-tenant access
@@ -142,9 +177,15 @@ INIT_SCHEMA = f"""
 {CREATE_UPDATED_AT_TRIGGER}
 
 -- Create tables in dependency order
-{CREATE_CONFIGS_TABLE}
+-- Users table must be created before configs (foreign key dependency)
 {CREATE_APPLICATIONS_TABLE}
 {CREATE_USERS_TABLE}
+{CREATE_CONFIGS_TABLE}
+
+-- Run migrations
+{MIGRATE_CONFIGS_ADD_USER_ID}
+{MIGRATE_CONFIGS_YAML_TO_JSON}
+
 {CREATE_SESSIONS_TABLE}
 {CREATE_SESSION_PARTICIPANTS_TABLE}
 {CREATE_CONFIGURATION_TABLE}

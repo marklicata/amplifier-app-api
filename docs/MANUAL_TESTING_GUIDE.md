@@ -65,7 +65,7 @@ Should return:
 ```json
 {
   "status": "healthy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "database_connected": true,
   "uptime_seconds": 1.23
 }

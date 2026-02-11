@@ -25,10 +25,10 @@ services:
       TELEMETRY_SAMPLE_RATE: 0.1  # Sample 10% in production
       TELEMETRY_ENABLE_DEV_LOGGER: false
       TELEMETRY_APP_INSIGHTS_CONNECTION_STRING: ${APP_INSIGHTS_CONNECTION_STRING}
-      
-      # Security - MUST override these
-      SECRET_KEY: ${SECRET_KEY}  # Required: Generate with openssl rand -hex 32
-      
+           
+      # Config Encryption
+      CONFIG_ENCRYPTION_KEY: 22600d1d658220ce475612a0eb4d81f9169e9928102e68b479c695414debc808
+
       # Production CORS - Restrict to your domains
       ALLOWED_ORIGINS: https://yourdomain.com,https://api.yourdomain.com
       

@@ -599,7 +599,7 @@ Root endpoint with service information.
 ```json
 {
   "service": "Amplifier App api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "REST API service for Amplifier AI development platform",
   "docs": "/docs",
   "health": "/health"
@@ -615,7 +615,7 @@ Service health check.
 ```json
 {
   "status": "healthy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "uptime": "Days: 0, Hours: 1, Minutes: 23, Seconds: 45",
   "database_connected": true
 }
@@ -629,7 +629,7 @@ Version information for service and dependencies.
 **Response:** `200 OK`
 ```json
 {
-  "service_version": "0.2.0",
+  "service_version": "0.3.0",
   "amplifier_core_version": "976fb87...",
   "amplifier_foundation_version": "412fcb5..."
 }
@@ -814,5 +814,5 @@ Server-side error.
 
 ---
 
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Last Updated:** 2026-02-06
