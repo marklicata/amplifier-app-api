@@ -28,10 +28,10 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 
 ### Statistics
 
-- **Total test files:** 33
-- **Total test cases:** 400+
-- **Lines of test code:** 12,000+
-- **API endpoint coverage:** 100% (37/37 endpoints)
+- **Total test files:** 28 (removed 6 obsolete test files)
+- **Total test cases:** 360+
+- **Lines of test code:** 10,000+
+- **API endpoint coverage:** 100% (23/23 endpoints)
 - **E2E coverage:** All endpoints tested with real HTTP server
 - **Test types:** Unit, Integration, E2E
 
@@ -41,11 +41,11 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 |------|-------|-------|-------------|
 | **Infrastructure** | 41 | ~2s | Database + Models (ASGI in-process) |
 | **Authentication** | 26 | ~15s | Applications, middleware, integration |
-| **E2E - Core Features** | 56 | ~5-10min | Messages, streaming, bundles, tools |
-| **E2E - Comprehensive** | 65+ | Varies | All endpoint validation |
+| **E2E - Core Features** | 20 | ~2-5min | Messages, streaming |
+| **E2E - Comprehensive** | 50+ | Varies | All endpoint validation |
 | **Smoke** | 13 | ~5s | Quick health checks |
 
-**Total E2E Tests:** 121+ tests with real HTTP server
+**Total E2E Tests:** 70+ tests with real HTTP server
 
 ---
 
@@ -69,14 +69,12 @@ cd /mnt/c/Users/malicata/source/amplifier-app-api
 **⚠️ Important:** E2E tests start a real service on port 8767. First run takes 5-10 minutes due to bundle downloads. Subsequent runs use cache.
 
 ```bash
-# Core features (56 tests) - Messages, streaming, bundles, tools
-.venv/bin/python -m pytest tests/test_session_messages_e2e.py tests/test_session_streaming_e2e.py tests/test_bundles_complete_e2e.py tests/test_tools_complete_e2e.py -v -m e2e
+# Core features (20 tests) - Messages, streaming
+.venv/bin/python -m pytest tests/test_session_messages_e2e.py tests/test_session_streaming_e2e.py -v -m e2e
 
 # Individual E2E test files
 .venv/bin/python -m pytest tests/test_session_messages_e2e.py -v -m e2e  # 13 tests
 .venv/bin/python -m pytest tests/test_session_streaming_e2e.py -v -m e2e  # 7 tests
-.venv/bin/python -m pytest tests/test_bundles_complete_e2e.py -v -m e2e  # 19 tests
-.venv/bin/python -m pytest tests/test_tools_complete_e2e.py -v -m e2e     # 17 tests
 
 # All E2E tests (121+ tests)
 .venv/bin/python -m pytest -m e2e -v
@@ -131,12 +129,12 @@ See [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) for detailed authen
 **Core E2E Tests:**
 - **`test_session_messages_e2e.py`** (13 tests) - **Actual AI message sending with responses**
 - **`test_session_streaming_e2e.py`** (7 tests) - **SSE streaming functionality**
-- **`test_bundles_complete_e2e.py`** (19 tests) - **Complete bundle lifecycle**
-- **`test_tools_complete_e2e.py`** (17 tests) - **Successful tool invocation**
-- **`test_e2e_all_endpoints.py`** (40+ tests) - All endpoints existence validation
-- **`test_e2e_live_service.py`** (25+ tests) - Live service validation
+- **`test_e2e_all_endpoints.py`** (30+ tests) - All endpoints existence validation
+- **`test_e2e_live_service.py`** (20+ tests) - Live service validation
 
-**Total E2E Tests:** 121+ tests covering all 37 endpoints with real HTTP requests
+**Total E2E Tests:** 70+ tests covering all 23 endpoints with real HTTP requests
+
+**Note:** test_bundles_complete_e2e.py and test_tools_complete_e2e.py were removed in v0.3.0 as bundle/tool registry endpoints were deleted.
 
 **Note:** E2E tests start a real uvicorn server on port 8767. First run is slow (bundle downloads). Subsequent runs use cache.
 
@@ -160,12 +158,11 @@ See [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) for detailed authen
 
 ### E2E Test Coverage
 
-- ✅ All 22 API endpoints
+- ✅ All 23 API endpoints
 - ✅ Health and version endpoints
 - ✅ Session creation (with real bundle loading)
 - ✅ Configuration management
-- ✅ Bundle operations
-- ✅ Tool endpoints
+- ✅ Application management
 - ✅ Error handling (404, 405, 422)
 - ✅ Complete workflows
 - ✅ Smoke test API endpoint
@@ -252,23 +249,6 @@ curl "http://localhost:8765/smoke-tests?verbose=true"
 - ✅ API key generation and validation
 - ✅ API key rotation
 - ✅ Application management (list, get, delete)
-
-### Bundles (5 endpoints)
-- ✅ Bundle registry operations
-- ✅ Bundle activation
-- ✅ Discovery and listing
-
-### Tools (5 endpoints)
-- ✅ Global tool registry
-- ✅ Tool discovery from bundles
-- ✅ Tool invocation
-
-### Providers (4 endpoints)
-- ✅ Global provider registry
-- ✅ Provider discovery
-- ✅ Provider management
-
-
 
 ### Health & Testing (5 endpoints)
 - ✅ Health checks and version info

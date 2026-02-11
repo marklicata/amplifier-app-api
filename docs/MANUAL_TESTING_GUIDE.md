@@ -276,12 +276,12 @@ curl -X PUT http://localhost:8765/configs/{config_id} \
 
 ## Step 5: Update Config with Additional Components
 
-To add more tools, providers, or bundles to a config, update the YAML via PUT:
+To add more tools, providers, or modules to a config, update the config_data via PUT:
 
 ### 5.1 Get Current Config
 ```bash
 CONFIG_ID="your-config-id-from-step-2"
-curl http://localhost:8765/configs/$CONFIG_ID | jq -r '.yaml_content' > current.yaml
+curl http://localhost:8765/configs/$CONFIG_ID | jq -r '.config_data' > current.json
 ```
 
 ### 5.2 Modify the YAML
@@ -792,11 +792,11 @@ vim .env
 ---
 
 ### Issue: "Bundle preparation timed out"
-**Cause:** Network issues downloading remote bundles
+**Cause:** Network issues downloading remote modules
 
 **Fix:**
 - Check internet connection
-- Try with local bundles only (foundation)
+- Verify module source URLs are accessible
 - Increase timeout in session_manager.py if needed
 
 ---

@@ -1,6 +1,62 @@
 # Global Registry API Documentation
 
-The Global Registry API provides centralized management for tools, providers, and bundles across the Amplifier platform. These registries allow you to:
+## ⚠️ DEPRECATED - Removed in v0.3.0
+
+**This document describes functionality that was removed in version 0.3.0.**
+
+The global registry endpoints (`/tools`, `/providers`, `/bundles`) have been removed to simplify the API.
+
+### What Changed
+
+**Before (v0.2.x):**
+- Register tools/providers/bundles in global registries via API endpoints
+- Reference registered components when creating configs
+
+**Now (v0.3.0+):**
+- Specify tools/providers directly in `config_data` when creating configs
+- Each config is self-contained with all necessary module sources
+- No separate registration step needed
+
+### Migration Guide
+
+Instead of:
+```bash
+# OLD: Register provider first
+POST /providers?name=anthropic-prod&module=provider-anthropic
+
+# Then reference it
+POST /configs
+{
+  "providers": [{"module": "anthropic-prod"}]
+}
+```
+
+Now do:
+```bash
+# NEW: Include provider directly in config
+POST /configs
+{
+  "config_data": {
+    "providers": [{
+      "module": "provider-anthropic",
+      "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+      "config": {"api_key": "...", "model": "claude-sonnet-4-5"}
+    }]
+  }
+}
+```
+
+See [API_REFERENCE.md](API_REFERENCE.md) for current endpoints.
+
+---
+
+## Historical Documentation (Pre-v0.3.0)
+
+The following documentation describes the registry API as it existed before v0.3.0:
+
+### Overview (Historical)
+
+The Global Registry API provided centralized management for tools, providers, and bundles across the Amplifier platform. These registries allowed you to:
 
 1. **Discover** available components
 2. **Register** new components for reuse
