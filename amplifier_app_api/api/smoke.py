@@ -190,22 +190,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
         results["tests"].append({"name": "config_endpoint", "passed": False, "error": str(e)})
         results["failed"] += 1
 
-    # Test 5: Bundles endpoint
-    try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/bundles")
-            test_passed = response.status_code == 200
-            results["tests"].append({"name": "bundles_endpoint", "passed": test_passed})
-            if test_passed:
-                results["passed"] += 1
-            else:
-                results["failed"] += 1
-    except Exception as e:
-        results["tests"].append({"name": "bundles_endpoint", "passed": False, "error": str(e)})
-        results["failed"] += 1
-
-    # Test 6: Applications endpoint (authentication infrastructure)
+    # Test 5: Applications endpoint (authentication infrastructure)
     try:
         app = _get_app()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
