@@ -8,13 +8,13 @@ Write-Host "Docker Image Testing Script" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 1: Stop the container
-Write-Host "[Step 1/5] Stop Docker image..." -ForegroundColor Yellow
-docker stop amplifier-app-api
+# Step 1: Stop and remove existing container
+Write-Host "[Step 1/5] Cleaning up existing container..." -ForegroundColor Yellow
+docker-compose down 2>$null
 
 # Step 2: Build the image
 Write-Host "[Step 2/5] Building Docker image..." -ForegroundColor Yellow
-docker build -t amplifier-app-api .
+docker-compose build
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Docker build failed!" -ForegroundColor Red
@@ -26,9 +26,8 @@ Write-Host ""
 
 # Step 3: Start the container
 Write-Host "[Step 3/5] Starting container..." -ForegroundColor Yellow
-$containerId = docker run -d --name amplifier-app-api -p 8765:8765 `
-    -e ANTHROPIC_API_KEY=test-key `
-    amplifier-app-api
+docker-compose up -d
+$containerId = docker ps --filter "name=amplifier-app-api" --format "{{.ID}}"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Failed to start container!" -ForegroundColor Red
@@ -81,8 +80,7 @@ Write-Host ""
 
 # Cleanup
 Write-Host "Cleaning up test container..." -ForegroundColor Yellow
-docker stop $containerId | Out-Null
-docker rm $containerId | Out-Null
+docker-compose down | Out-Null
 Write-Host "✓ Cleanup complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "✓ All tests passed! Your image is ready to deploy." -ForegroundColor Green
