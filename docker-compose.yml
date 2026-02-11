@@ -21,7 +21,7 @@ services:
 
       # Database
       DATABASE_HOST: amplifier-api-db-dev.postgres.database.azure.com
-      DATABASE_USER: amplifierdbtest
+      DATABASE_USER: amplifierdbtest@amplifier-api-db-dev
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-}
       DATABASE_PORT: 5432
       DATABASE_NAME: postgres

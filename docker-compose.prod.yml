@@ -14,7 +14,7 @@ services:
 
       # Database - Production settings
       DATABASE_HOST: amplifier-api-db-prod.postgres.database.azure.com
-      DATABASE_USER: amplifierdbprod
+      DATABASE_USER: amplifierdbprod@amplifier-api-db-prod
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-}
       DATABASE_PORT: 5432
       DATABASE_NAME: postgres
