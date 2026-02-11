@@ -86,6 +86,7 @@ OPENAI_API_KEY=sk-your-key-here
 ```bash
 # Auth disabled by default for easy local development
 AUTH_REQUIRED=false
+USE_GITHUB_AUTH_IN_DEV=true  # Uses your GitHub username (from gh CLI) as user_id
 
 # For production, set AUTH_REQUIRED=true and configure:
 SECRET_KEY=<generate-with-openssl-rand-hex-32>
@@ -147,7 +148,7 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "uptime_seconds": 5.2,
   "database_connected": true
 }

@@ -135,11 +135,13 @@ class ConfigManager:
         logger.info(f"Created config: {config_id} ({name})")
         return config
 
-    async def get_config(self, config_id: str) -> Config | None:
+    async def get_config(self, config_id: str, decrypt: bool = True) -> Config | None:
         """Get config by ID.
 
         Args:
             config_id: Config identifier
+            decrypt: If True, decrypt sensitive fields. If False, return encrypted as stored.
+                     Use False for API responses to apps, True for internal session use.
 
         Returns:
             Config or None if not found
@@ -151,10 +153,12 @@ class ConfigManager:
         # Parse JSON string back to dict
         config_data = json.loads(data["config_json"])
 
-        # Decrypt sensitive fields after retrieval
-        if self._encryption:
+        # Decrypt sensitive fields after retrieval (only if requested)
+        if decrypt and self._encryption:
             config_data = self._encryption.decrypt_config(config_data)
             logger.debug("Decrypted sensitive fields in config")
+        elif not decrypt:
+            logger.debug("Returning config with encrypted fields (as stored)")
 
         return Config(
             config_id=data["config_id"],
@@ -190,7 +194,7 @@ class ConfigManager:
         Raises:
             ValueError: If config_data is invalid
         """
-        config = await self.get_config(config_id)
+        config = await self.get_config(config_id, decrypt=True)
         if not config:
             return None
 
@@ -226,7 +230,7 @@ class ConfigManager:
             logger.info(f"Invalidated bundle cache for config: {config_id}")
 
         logger.info(f"Updated config: {config_id}")
-        return await self.get_config(config_id)
+        return await self.get_config(config_id, decrypt=True)
 
     async def delete_config(self, config_id: str) -> bool:
         """Delete a config.

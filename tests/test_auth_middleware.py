@@ -1,6 +1,7 @@
 """Tests for authentication middleware."""
 
-from unittest.mock import patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
@@ -268,3 +269,159 @@ async def test_jwt_only_mode_missing_app_claim_rejected(client: AsyncClient):
             )
             assert response.status_code == 401
             assert "missing 'app_id' claim" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_github_auth_in_dev_mode_with_gh_cli(client: AsyncClient):
+    """Test that GitHub username is used in dev mode when gh CLI is available."""
+    from amplifier_app_api.config import settings
+    from amplifier_app_api.middleware import auth
+
+    # Clear cache
+    auth._github_user_cache = None
+
+    # Mock subprocess that returns a GitHub username
+    mock_process = AsyncMock()
+    mock_process.returncode = 0
+    mock_process.communicate = AsyncMock(return_value=(b"test-gh-user\n", b""))
+
+    with patch.object(settings, "auth_required", False):
+        with patch.object(settings, "use_github_auth_in_dev", True):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+                with patch("asyncio.wait_for", return_value=mock_process):
+                    # Clear cache before test
+                    auth._github_user_cache = None
+
+                    response = await client.get("/sessions")
+
+                    # Should succeed (200, not 401)
+                    assert response.status_code == 200
+
+                    # Verify the cache was set
+                    assert auth._github_user_cache == "test-gh-user"
+
+
+@pytest.mark.asyncio
+async def test_github_auth_fallback_when_gh_cli_fails(client: AsyncClient):
+    """Test fallback to 'dev-user' when gh CLI is not available."""
+    from amplifier_app_api.config import settings
+    from amplifier_app_api.middleware import auth
+
+    # Clear cache
+    auth._github_user_cache = None
+
+    # Mock subprocess that fails
+    mock_process = AsyncMock()
+    mock_process.returncode = 1
+    mock_process.communicate = AsyncMock(return_value=(b"", b"not logged in\n"))
+
+    with patch.object(settings, "auth_required", False):
+        with patch.object(settings, "use_github_auth_in_dev", True):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+                with patch("asyncio.wait_for", return_value=mock_process):
+                    # Clear cache before test
+                    auth._github_user_cache = None
+
+                    response = await client.get("/sessions")
+
+                    # Should succeed (200, not 401)
+                    assert response.status_code == 200
+
+                    # Should fall back to dev-user
+                    assert auth._github_user_cache == "dev-user"
+
+
+@pytest.mark.asyncio
+async def test_github_auth_fallback_on_timeout(client: AsyncClient):
+    """Test fallback to 'dev-user' when gh CLI times out."""
+    from amplifier_app_api.config import settings
+    from amplifier_app_api.middleware import auth
+
+    # Clear cache
+    auth._github_user_cache = None
+
+    with patch.object(settings, "auth_required", False):
+        with patch.object(settings, "use_github_auth_in_dev", True):
+            # Mock asyncio.wait_for to raise TimeoutError
+            with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError):
+                # Clear cache before test
+                auth._github_user_cache = None
+
+                response = await client.get("/sessions")
+
+                # Should succeed (200, not 401)
+                assert response.status_code == 200
+
+                # Should fall back to dev-user
+                assert auth._github_user_cache == "dev-user"
+
+
+@pytest.mark.asyncio
+async def test_github_auth_disabled_uses_dev_user(client: AsyncClient):
+    """Test that 'dev-user' is used when GitHub auth is disabled."""
+    from amplifier_app_api.config import settings
+    from amplifier_app_api.middleware import auth
+
+    # Clear cache
+    auth._github_user_cache = None
+
+    with patch.object(settings, "auth_required", False):
+        with patch.object(settings, "use_github_auth_in_dev", False):
+            response = await client.get("/sessions")
+
+            # Should succeed (200, not 401)
+            assert response.status_code == 200
+
+            # Should use dev-user (cache should remain None since feature is disabled)
+            # The cache is only set when use_github_auth_in_dev is True
+
+
+@pytest.mark.asyncio
+async def test_github_auth_cache_reused(client: AsyncClient):
+    """Test that GitHub username is cached and subprocess is not called repeatedly."""
+    from amplifier_app_api.config import settings
+    from amplifier_app_api.middleware import auth
+
+    # Set cache directly
+    auth._github_user_cache = "cached-gh-user"
+
+    mock_subprocess = AsyncMock()
+
+    with patch.object(settings, "auth_required", False):
+        with patch.object(settings, "use_github_auth_in_dev", True):
+            with patch("asyncio.create_subprocess_exec", mock_subprocess):
+                # Make two requests
+                response1 = await client.get("/sessions")
+                response2 = await client.get("/sessions")
+
+                # Both should succeed
+                assert response1.status_code == 200
+                assert response2.status_code == 200
+
+                # Subprocess should NOT have been called (cache was used)
+                mock_subprocess.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_github_auth_with_file_not_found(client: AsyncClient):
+    """Test fallback when gh CLI is not installed (FileNotFoundError)."""
+    from amplifier_app_api.config import settings
+    from amplifier_app_api.middleware import auth
+
+    # Clear cache
+    auth._github_user_cache = None
+
+    with patch.object(settings, "auth_required", False):
+        with patch.object(settings, "use_github_auth_in_dev", True):
+            # Mock asyncio.create_subprocess_exec to raise FileNotFoundError
+            with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError("gh not found")):
+                # Clear cache before test
+                auth._github_user_cache = None
+
+                response = await client.get("/sessions")
+
+                # Should succeed (200, not 401)
+                assert response.status_code == 200
+
+                # Should fall back to dev-user
+                assert auth._github_user_cache == "dev-user"

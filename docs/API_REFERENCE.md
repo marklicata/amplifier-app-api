@@ -394,7 +394,7 @@ Root endpoint with service information.
 ```json
 {
   "service": "Amplifier App api",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "REST API service for Amplifier AI development platform",
   "docs": "/docs",
   "health": "/health"
@@ -410,7 +410,7 @@ Service health check.
 ```json
 {
   "status": "healthy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "uptime": "Days: 0, Hours: 1, Minutes: 23, Seconds: 45",
   "database_connected": true
 }
@@ -424,7 +424,7 @@ Version information for service and dependencies.
 **Response:** `200 OK`
 ```json
 {
-  "service_version": "0.3.0",
+  "service_version": "0.4.0",
   "amplifier_core_version": "976fb87...",
   "amplifier_foundation_version": "412fcb5..."
 }
@@ -603,11 +603,10 @@ Server-side error.
 ## Related Documentation
 
 - [CONFIG_API.md](./CONFIG_API.md) - Detailed config API documentation
-- [REGISTRY_API.md](./REGISTRY_API.md) - Registry operations guide
 - [TESTING_AUTHENTICATION.md](./TESTING_AUTHENTICATION.md) - Authentication setup
-- [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md) - Manual testing procedures
+- [TESTING.md](./TESTING.md) - Comprehensive testing guide
 
 ---
 
-**Version:** 0.3.0  
-**Last Updated:** 2026-02-06
+**Version:** 0.4.0
+**Last Updated:** 2026-02-11

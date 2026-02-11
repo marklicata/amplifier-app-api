@@ -111,6 +111,7 @@ async def create_config(
             updated_at=config.updated_at,
             tags=config.tags,
             message="Config created successfully",
+            encrypted=False,  # create_config returns decrypted data
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -146,20 +147,28 @@ async def list_configs(
 @router.get("/{config_id}", response_model=ConfigResponse)
 async def get_config(
     config_id: str,
+    decrypt: bool = False,
     manager: ConfigManager = Depends(get_config_manager),
 ) -> ConfigResponse:
     """Get config by ID.
 
     Args:
         config_id: Config identifier
+        decrypt: If True, return with decrypted API keys (for debugging/admin use).
+                 If False (default), return with encrypted keys (secure for apps).
+                 In Swagger UI, toggle this to see encrypted vs decrypted values.
 
     Returns:
-        ConfigResponse: The config details
+        ConfigResponse: The config details with keys encrypted or decrypted based on parameter
 
     Raises:
         HTTPException: 404 if not found, 500 on other errors
+
+    Security Note:
+        - decrypt=False (default): Returns config with encrypted keys (keys have "enc:" prefix)
+        - decrypt=True: Returns config with plain text keys (use with caution)
     """
-    config = await manager.get_config(config_id)
+    config = await manager.get_config(config_id, decrypt=decrypt)
     if not config:
         raise HTTPException(status_code=404, detail="Config not found")
 
@@ -172,6 +181,7 @@ async def get_config(
         created_at=config.created_at,
         updated_at=config.updated_at,
         tags=config.tags,
+        encrypted=not decrypt,
     )
 
 
@@ -209,7 +219,7 @@ async def update_config(
                 config_data = dict(request.config_data)
             else:
                 # If no config_data provided but we have top-level fields, we need to merge with existing
-                existing_config = await manager.get_config(config_id)
+                existing_config = await manager.get_config(config_id, decrypt=True)
                 if not existing_config:
                     raise HTTPException(status_code=404, detail="Config not found")
                 config_data = dict(existing_config.config_data)
@@ -245,6 +255,7 @@ async def update_config(
             updated_at=config.updated_at,
             tags=config.tags,
             message="Config updated successfully",
+            encrypted=False,  # update_config returns decrypted data
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

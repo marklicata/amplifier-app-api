@@ -116,6 +116,10 @@ class Settings(BaseSettings):
         default=False,
         description="Require authentication (set to True for production)",
     )
+    use_github_auth_in_dev: bool = Field(
+        default=True,
+        description="Use GitHub CLI (gh) for user_id when auth is disabled (falls back to 'dev-user')",
+    )
     api_key_header: str = Field(
         default="X-API-Key", description="Header name for API key authentication"
     )
