@@ -8,9 +8,13 @@ Write-Host "Docker Image Testing Script" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 1: Build the image
-Write-Host "[Step 1/4] Building Docker image..." -ForegroundColor Yellow
-docker build -t amplifier-app-api:test .
+# Step 1: Stop the container
+Write-Host "[Step 1/5] Stop Docker image..." -ForegroundColor Yellow
+docker stop amplifier-app-api
+
+# Step 2: Build the image
+Write-Host "[Step 2/5] Building Docker image..." -ForegroundColor Yellow
+docker build -t amplifier-app-api .
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Docker build failed!" -ForegroundColor Red
@@ -20,11 +24,11 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ Docker build successful!" -ForegroundColor Green
 Write-Host ""
 
-# Step 2: Start the container
-Write-Host "[Step 2/4] Starting container..." -ForegroundColor Yellow
-$containerId = docker run -d --name amplifier-test -p 8765:8765 `
+# Step 3: Start the container
+Write-Host "[Step 3/5] Starting container..." -ForegroundColor Yellow
+$containerId = docker run -d --name amplifier-app-api -p 8765:8765 `
     -e ANTHROPIC_API_KEY=test-key `
-    amplifier-app-api:test
+    amplifier-app-api
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Failed to start container!" -ForegroundColor Red
@@ -33,8 +37,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ Container started (ID: $containerId)" -ForegroundColor Green
 Write-Host ""
 
-# Step 3: Wait for app to be ready
-Write-Host "[Step 3/4] Waiting for app to be ready..." -ForegroundColor Yellow
+# Step 4: Wait for app to be ready
+Write-Host "[Step 4/5] Waiting for app to be ready..." -ForegroundColor Yellow
 Start-Sleep -Seconds 10
 
 # Check container is still running
@@ -49,8 +53,8 @@ if (-not $running) {
 Write-Host "✓ Container is running" -ForegroundColor Green
 Write-Host ""
 
-# Step 4: Test HTTP endpoint
-Write-Host "[Step 4/4] Testing HTTP endpoint..." -ForegroundColor Yellow
+# Step 5: Test HTTP endpoint
+Write-Host "[Step 5/5] Testing HTTP endpoint..." -ForegroundColor Yellow
 try {
     $response = Invoke-WebRequest -Uri "http://localhost:8765" -TimeoutSec 5 -UseBasicParsing
     if ($response.StatusCode -eq 200) {
