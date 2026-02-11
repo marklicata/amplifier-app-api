@@ -62,10 +62,12 @@ class ConfigCreateRequest(BaseModel):
             {
                 "orchestrator": {
                     "module": "loop-streaming",
+                    "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
                     "config": {"extended_thinking": True},
                 },
                 "context": {
                     "module": "context-simple",
+                    "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
                     "config": {
                         "max_tokens": 3000000,
                         "compact_threshold": 0.8,
@@ -81,6 +83,7 @@ class ConfigCreateRequest(BaseModel):
         examples=[
             {
                 "module": "provider-anthropic",
+                "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
                 "config": {"api_key": "sk-ant-XXXX", "model": "claude-sonnet-4-5"},
             }
         ],

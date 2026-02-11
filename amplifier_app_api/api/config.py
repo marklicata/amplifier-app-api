@@ -40,9 +40,8 @@ Create a new config (complete bundle configuration).
 A config contains everything needed to start an Amplifier session.
 Configs are reusable - create once, use for multiple sessions.
 
-**Shorthand Support:** You can use shorthand names for pre-installed modules:
-- `"orchestrator": "loop-streaming"` → uses pre-installed module
-- `"context": "context-simple"` → uses pre-installed module
+**Module Sources:** All modules (orchestrator, context, providers, tools) require a `source` field
+pointing to their git repository or installation source.
 
 Example:
 ```json
@@ -53,11 +52,20 @@ Example:
     "includes": [{"bundle": "foundation"}]
   },
   "session": {
-    "orchestrator": "loop-streaming",
-    "context": "context-simple"
+    "orchestrator": {
+      "module": "loop-streaming",
+      "source": "git+https://github.com/microsoft/amplifier-module-loop-streaming@main",
+      "config": {}
+    },
+    "context": {
+      "module": "context-simple",
+      "source": "git+https://github.com/microsoft/amplifier-module-context-simple@main",
+      "config": {}
+    }
   },
   "providers": [{
     "module": "provider-anthropic",
+    "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
     "config": {"api_key": "${ANTHROPIC_API_KEY}", "model": "claude-sonnet-4-5"}
   }]
 }
