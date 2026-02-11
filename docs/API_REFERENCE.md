@@ -1,6 +1,6 @@
 # API Reference - Complete Endpoint Guide
 
-Complete reference for all 37 API endpoints in Amplifier App API.
+Complete reference for all 23 API endpoints in Amplifier App API.
 
 ## Table of Contents
 
@@ -8,16 +8,15 @@ Complete reference for all 37 API endpoints in Amplifier App API.
 - [Sessions (8 endpoints)](#sessions-8-endpoints)
 - [Configs (5 endpoints)](#configs-5-endpoints)
 - [Applications (5 endpoints)](#applications-5-endpoints)
-- [Tools (5 endpoints)](#tools-5-endpoints)
-- [Providers (4 endpoints)](#providers-4-endpoints)
-- [Bundles (5 endpoints)](#bundles-5-endpoints)
 - [Health & Testing (5 endpoints)](#health--testing-5-endpoints)
 
 ---
 
 ## Overview
 
-**Total Endpoints:** 37
+**Total Endpoints:** 23
+
+**Note:** In version 0.3.0, the /bundles, /tools, and /providers registry endpoints were removed. These are now managed directly through config_data when creating/updating configs.
 
 **Base URL:** `http://localhost:8765` (development) or your production domain
 
@@ -381,210 +380,6 @@ Regenerate API key for an application.
 ```
 
 **⚠️ The old API key stops working immediately!**
-
----
-
-## Tools (5 endpoints)
-
-Tool management includes both global registry and bundle inspection.
-
-### POST /tools
-Register a tool in the global registry.
-
-**Query Parameters:**
-- `name` (required)
-- `source` (required)
-- `module` (optional, defaults to name)
-- `description` (optional)
-
-**Request Body (optional):**
-```json
-{
-  "timeout": 30,
-  "max_retries": 3
-}
-```
-
-**Response:** `201 Created`
-
----
-
-### GET /tools
-List tools (two modes).
-
-**Mode 1: From Registry**
-```bash
-GET /tools?from_registry=true
-```
-
-**Mode 2: From Bundle (default)**
-```bash
-GET /tools?bundle=foundation
-```
-
-**Response:** `200 OK`
-```json
-{
-  "tools": [
-    {
-      "name": "read_file",
-      "description": "Read a file",
-      "parameters": {}
-    }
-  ]
-}
-```
-
----
-
-### GET /tools/{tool_name}
-Get tool information (from registry or bundle).
-
-**Query Parameters:**
-- `from_registry=true` - Get from registry
-- `bundle=foundation` - Get from specific bundle
-
----
-
-### DELETE /tools/{tool_name}
-Remove a tool from the global registry.
-
----
-
-### POST /tools/invoke
-Invoke a tool with parameters.
-
-**Request:**
-```json
-{
-  "tool_name": "read_file",
-  "parameters": {
-    "file_path": "README.md"
-  }
-}
-```
-
-**Query Parameters:**
-- `bundle` (optional) - Which bundle to use (defaults to active or foundation)
-
-**Response:** `200 OK`
-```json
-{
-  "tool": "read_file",
-  "result": {...},
-  "parameters": {...}
-}
-```
-
----
-
-## Providers (4 endpoints)
-
-Global provider registry for LLM providers.
-
-### POST /providers
-Register a provider.
-
-**Query Parameters:**
-- `name` (required)
-- `module` (required)
-- `source` (optional)
-- `description` (optional)
-
-**Request Body (optional):**
-```json
-{
-  "default_model": "claude-sonnet-4-5",
-  "priority": 1
-}
-```
-
----
-
-### GET /providers
-List all registered providers.
-
-**Response:** `200 OK`
-```json
-{
-  "anthropic-prod": {
-    "module": "provider-anthropic",
-    "source": "git+https://...",
-    "description": "Production Anthropic provider",
-    "config": {...}
-  }
-}
-```
-
----
-
-### GET /providers/{provider_name}
-Get specific provider from registry.
-
----
-
-### DELETE /providers/{provider_name}
-Remove provider from registry.
-
----
-
-## Bundles (5 endpoints)
-
-Bundle registry for managing reusable bundle packages.
-
-### POST /bundles
-Add a bundle to the registry.
-
-**Request:**
-```json
-{
-  "name": "my-bundle",
-  "source": "git+https://github.com/example/bundle",
-  "scope": "global"
-}
-```
-
----
-
-### GET /bundles
-List all registered bundles.
-
-**Response:** `200 OK`
-```json
-{
-  "bundles": [
-    {
-      "name": "foundation",
-      "source": "git+https://...",
-      "active": true,
-      "description": "Foundation bundle"
-    }
-  ],
-  "active": "foundation"
-}
-```
-
----
-
-### GET /bundles/{bundle_name}
-Get bundle details.
-
----
-
-### DELETE /bundles/{bundle_name}
-Remove bundle from registry.
-
----
-
-### POST /bundles/{bundle_name}/activate
-Set the active bundle.
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Bundle 'foundation' activated"
-}
-```
 
 ---
 
