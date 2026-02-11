@@ -2,11 +2,11 @@
 
 ## Overview
 
-Comprehensive test suite for the Recipe Management System with 100+ test cases covering validation, business logic, API endpoints, and end-to-end workflows.
+Comprehensive test suite for the Recipe Management System with 82 test cases covering validation, business logic, API endpoints, and end-to-end workflows.
 
 ## Test Files
 
-### 1. `tests/test_recipe_validation.py` (40+ tests)
+### 1. `tests/test_recipe_validation.py` (27 tests)
 
 **Purpose:** Unit tests for recipe validation logic
 
@@ -40,7 +40,7 @@ test_agent_step_requires_agent_and_prompt()
 test_multi_step_recipe_with_dependencies()
 ```
 
-### 2. `tests/test_recipe_manager.py` (30+ tests)
+### 2. `tests/test_recipe_manager.py` (30 tests)
 
 **Purpose:** Integration tests for RecipeManager business logic
 
@@ -73,7 +73,7 @@ test_update_recipe_invalid_data()
 test_delete_recipe_wrong_user()
 ```
 
-### 3. `tests/test_recipe_api.py` (30+ tests)
+### 3. `tests/test_recipe_api.py` (25 tests)
 
 **Purpose:** API endpoint tests (REST API)
 
@@ -108,7 +108,7 @@ test_delete_recipe_success()
 test_concurrent_creates_same_name()
 ```
 
-### 4. `tests/test_recipes_comprehensive.py` (20+ tests)
+### 4. `tests/test_recipes_comprehensive.py` (8 tests)
 
 **Purpose:** End-to-end integration tests for complete workflows
 
@@ -223,11 +223,11 @@ pytest tests/test_recipe*.py --cov=amplifier_app_api --cov-report=html
 
 | Component | Test Files | Test Cases | Coverage |
 |-----------|------------|------------|----------|
-| Validation | test_recipe_validation.py | 40+ | 100% |
-| Manager | test_recipe_manager.py | 30+ | 95%+ |
-| API | test_recipe_api.py | 30+ | 95%+ |
-| E2E | test_recipes_comprehensive.py | 20+ | - |
-| **Total** | **4 files** | **120+** | **~98%** |
+| Validation | test_recipe_validation.py | 27 | 100% |
+| Manager | test_recipe_manager.py | 30 | 95%+ |
+| API | test_recipe_api.py | 25 | 95%+ |
+| E2E | test_recipes_comprehensive.py | 8 | - |
+| **Total** | **4 files** | **82** | **~98%** |
 
 ### By Feature
 
@@ -523,11 +523,11 @@ open htmlcov/index.html
 ## Summary
 
 The recipe system test suite provides comprehensive coverage across all layers:
-- **Validation Layer:** 40+ tests ensuring data integrity
-- **Business Logic Layer:** 30+ tests for RecipeManager operations
-- **API Layer:** 30+ tests for REST endpoints
-- **E2E Layer:** 20+ tests for complete workflows
+- **Validation Layer:** 27 tests ensuring data integrity
+- **Business Logic Layer:** 30 tests for RecipeManager operations
+- **API Layer:** 25 tests for REST endpoints
+- **E2E Layer:** 8 tests for complete workflows
 
-**Total: 120+ test cases with ~98% code coverage**
+**Total: 82 test cases with ~98% code coverage**
 
 All tests are automated, isolated, and can be run individually or as a suite. The test suite ensures the recipe system is robust, reliable, and ready for production use.
