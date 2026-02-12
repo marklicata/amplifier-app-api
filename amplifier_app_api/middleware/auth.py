@@ -43,6 +43,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
     ]
 
     @staticmethod
+    async def _ensure_user_exists(user_id: str, app_id: str | None = None) -> None:
+        """Ensure a user exists in the database.
+
+        Args:
+            user_id: User identifier
+            app_id: Optional application ID
+        """
+        try:
+            from ..storage.database import get_db
+
+            db = await get_db()
+            await db.ensure_user(user_id, app_id)
+        except Exception as e:
+            # Log but don't fail the request if user creation fails
+            logger.warning(f"Failed to ensure user exists: {e}")
+
+    @staticmethod
     async def _get_github_user() -> str:
         """Get GitHub username from gh CLI, with fallback to 'dev-user'.
 
@@ -120,6 +137,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             else:
                 request.state.user_id = "dev-user"
 
+            # Ensure the user exists in the database
+            await self._ensure_user_exists(request.state.user_id, request.state.app_id)
+
             logger.debug(
                 f"Auth disabled - using dev credentials (app_id={request.state.app_id}, "
                 f"user_id={request.state.user_id})"
@@ -141,6 +161,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Set authenticated context
             request.state.app_id = app_id
             request.state.user_id = user_id
+
+            # Ensure the user exists in the database
+            await self._ensure_user_exists(user_id, app_id)
 
             logger.info(f"Authenticated request: app_id={app_id}, user_id={user_id}")
             return await call_next(request)

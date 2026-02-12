@@ -644,6 +644,34 @@ class Database:
 
         return count or 0
 
+    async def ensure_user(self, user_id: str, app_id: str | None = None) -> None:
+        """Ensure a user exists in the database, creating if necessary.
+
+        Uses UPSERT (INSERT ... ON CONFLICT DO UPDATE) to create the user
+        if they don't exist, or update their last_seen timestamp if they do.
+
+        Args:
+            user_id: User identifier
+            app_id: Optional application ID to track in last_seen_app_id
+        """
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO users (user_id, first_seen, last_seen, last_seen_app_id, total_sessions)
+                VALUES ($1, NOW(), NOW(), $2, 0)
+                ON CONFLICT (user_id) DO UPDATE
+                SET last_seen = NOW(),
+                    last_seen_app_id = COALESCE($2, users.last_seen_app_id)
+                """,
+                user_id,
+                app_id,
+            )
+
+        logger.debug(f"Ensured user exists: {user_id}")
+
 
 # Global database instance
 _db: Database | None = None
