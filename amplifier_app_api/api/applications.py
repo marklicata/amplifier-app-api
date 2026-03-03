@@ -19,9 +19,18 @@ def generate_api_key() -> str:
     """Generate a secure API key.
 
     Format: app_{random_32_chars}
+    The first 8 chars after 'app_' serve as a lookup prefix.
     """
     random_part = secrets.token_urlsafe(32)
     return f"app_{random_part}"
+
+
+def get_api_key_prefix(api_key: str) -> str:
+    """Extract the lookup prefix from an API key.
+
+    Returns the first 12 chars (e.g., 'app_XXXXXXXX') for indexed lookup.
+    """
+    return api_key[:12]
 
 
 @router.post(
@@ -61,8 +70,9 @@ async def create_application(
             )
 
         api_key = generate_api_key()
+        prefix = get_api_key_prefix(api_key)
         api_key_hash = bcrypt.hashpw(api_key.encode(), bcrypt.gensalt()).decode()
-        now = await db.create_application(request.app_id, request.app_name, api_key_hash)
+        now = await db.create_application(request.app_id, request.app_name, api_key_hash, prefix)
 
         logger.info(f"Application registered: {request.app_id}")
 
@@ -185,8 +195,9 @@ async def regenerate_api_key(
             raise HTTPException(status_code=404, detail="Application not found")
 
         api_key = generate_api_key()
+        prefix = get_api_key_prefix(api_key)
         api_key_hash = bcrypt.hashpw(api_key.encode(), bcrypt.gensalt()).decode()
-        await db.update_application_key(app_id, api_key_hash)
+        await db.update_application_key(app_id, api_key_hash, prefix)
 
         logger.info(f"API key regenerated for: {app_id}")
 

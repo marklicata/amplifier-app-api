@@ -177,6 +177,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def _verify_api_key(self, request: Request) -> str:
         """Verify API key and return app_id.
 
+        Uses key prefix for O(1) database lookup, then runs a single
+        bcrypt verification in a thread to avoid blocking the event loop.
+
         Args:
             request: FastAPI request
 
@@ -199,12 +202,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.error(f"Failed to get database: {e}")
             raise HTTPException(status_code=503, detail="Database not available")
 
-        # Look up application by API key
-        applications = await db.find_application_by_api_key_hash()
+        # Try prefix-based O(1) lookup first
+        prefix = api_key[:12]
+        applications = await db.find_applications_by_key_prefix(prefix)
+
+        # Fallback to legacy keys without prefix
+        if not applications:
+            applications = await db.find_all_applications_for_key_check()
 
         for app in applications:
-            # Verify the API key against stored hash
-            if bcrypt.checkpw(api_key.encode(), app["api_key_hash"].encode()):
+            # Run bcrypt in a thread to avoid blocking the event loop
+            match = await asyncio.to_thread(
+                bcrypt.checkpw, api_key.encode(), app["api_key_hash"].encode()
+            )
+            if match:
                 if not app["is_active"]:
                     raise HTTPException(status_code=401, detail="Application is disabled")
                 return app["app_id"]

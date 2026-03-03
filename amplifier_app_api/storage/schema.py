@@ -82,16 +82,33 @@ CREATE TABLE IF NOT EXISTS applications (
     app_id VARCHAR(100) PRIMARY KEY,
     app_name VARCHAR(255) NOT NULL,
     api_key_hash VARCHAR(255) NOT NULL,
+    api_key_prefix VARCHAR(16),
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     settings JSONB DEFAULT '{}'::jsonb
 );
 
+CREATE INDEX IF NOT EXISTS idx_applications_api_key_prefix ON applications(api_key_prefix);
+
 DROP TRIGGER IF EXISTS update_applications_updated_at ON applications;
 CREATE TRIGGER update_applications_updated_at
     BEFORE UPDATE ON applications
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+"""
+
+# Migration: Add api_key_prefix column if it doesn't exist
+MIGRATE_APPLICATIONS_ADD_KEY_PREFIX = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'applications' AND column_name = 'api_key_prefix'
+    ) THEN
+        ALTER TABLE applications ADD COLUMN api_key_prefix VARCHAR(16);
+        CREATE INDEX IF NOT EXISTS idx_applications_api_key_prefix ON applications(api_key_prefix);
+    END IF;
+END $$;
 """
 
 # Users table - user analytics and metadata tracking
@@ -220,6 +237,7 @@ INIT_SCHEMA = f"""
 -- Run migrations
 {MIGRATE_CONFIGS_ADD_USER_ID}
 {MIGRATE_CONFIGS_YAML_TO_JSON}
+{MIGRATE_APPLICATIONS_ADD_KEY_PREFIX}
 
 {CREATE_SESSIONS_TABLE}
 {CREATE_SESSION_PARTICIPANTS_TABLE}
