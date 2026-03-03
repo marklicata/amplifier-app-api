@@ -69,6 +69,8 @@ class Settings(BaseSettings):
         default="development-secret-key-change-in-production",
         description="Secret key for JWT encoding",
     )
+    _DEFAULT_SECRET_KEY = "development-secret-key-change-in-production"
+
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(
         default=30, description="Access token expiration in minutes"
@@ -177,6 +179,30 @@ class Settings(BaseSettings):
         if self.google_api_key:
             keys["GOOGLE_API_KEY"] = self.google_api_key
         return keys
+
+    def validate_security(self) -> None:
+        """Validate security settings on startup.
+
+        Raises:
+            SystemExit: If auth_required=True but secret_key is the insecure default
+        """
+        import logging
+        import sys
+
+        logger = logging.getLogger(__name__)
+
+        if self.auth_required and self.secret_key == self._DEFAULT_SECRET_KEY:
+            logger.critical(
+                "FATAL: auth_required=True but SECRET_KEY is the insecure default. "
+                "Set a secure SECRET_KEY (e.g., openssl rand -hex 32) before running in production."
+            )
+            sys.exit(1)
+
+        if not self.auth_required and self.secret_key == self._DEFAULT_SECRET_KEY:
+            logger.warning(
+                "SECRET_KEY is the insecure default. This is acceptable for local development "
+                "but must be changed before enabling authentication."
+            )
 
 
 # Global settings instance
