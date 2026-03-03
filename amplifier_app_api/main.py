@@ -4,6 +4,7 @@ import logging
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from importlib.metadata import version as pkg_version
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -140,7 +141,7 @@ Lightweight runtime instances that reference a Config:
 - `GET /api/health` - Health check
 - `GET /api/smoke` - Smoke test suite
 """,
-    version="0.3.0",
+    version=pkg_version("amplifier-app-api"),
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
