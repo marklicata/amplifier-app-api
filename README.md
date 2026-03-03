@@ -93,10 +93,10 @@ amplifier-app-api/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/configs` | Create a new config (YAML bundle) |
+| POST | `/configs` | Create a new config (JSON bundle) |
 | GET | `/configs` | List all configs |
 | GET | `/configs/{id}` | Get config details |
-| PUT | `/configs/{id}` | Update config (modify YAML directly) |
+| PUT | `/configs/{id}` | Update config |
 | DELETE | `/configs/{id}` | Delete a config |
 
 ### Session Management (8 endpoints)
@@ -165,7 +165,7 @@ amplifier-app-api/
 
 ## Usage Examples
 
-### 1. Create a Config (YAML Bundle)
+### 1. Create a Config (JSON Bundle)
 
 First, create a config that defines your Amplifier setup:
 
@@ -175,7 +175,21 @@ curl -X POST http://localhost:8765/configs \
   -d '{
     "name": "my-dev-config",
     "description": "Development configuration with Anthropic",
-    "yaml_content": "bundle:\n  name: dev-config\n  version: 1.0.0\n\nincludes:\n  - bundle: foundation\n\nproviders:\n  - module: provider-anthropic\n    config:\n      api_key: ${ANTHROPIC_API_KEY}\n      model: claude-sonnet-4-5\n\nsession:\n  orchestrator: loop-streaming\n  context: context-persistent"
+    "config_data": {
+      "bundle": {"name": "dev-config", "version": "1.0.0"},
+      "includes": [{"bundle": "foundation"}]
+    },
+    "providers": [
+      {
+        "module": "provider-anthropic",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-anthropic@main",
+        "config": {"api_key": "${ANTHROPIC_API_KEY}", "model": "claude-sonnet-4-5"}
+      }
+    ],
+    "session": {
+      "orchestrator": {"module": "loop-streaming"},
+      "context": {"module": "context-persistent"}
+    }
   }'
 ```
 
@@ -185,7 +199,7 @@ curl -X POST http://localhost:8765/configs \
   "config_id": "c7a3f9e2-1b4d-4c8a-9f2e-d6b8a1c5e3f7",
   "name": "my-dev-config",
   "description": "Development configuration with Anthropic",
-  "yaml_content": "bundle:\n  name: dev-config...",
+  "config_data": {"bundle": {"name": "dev-config", "version": "1.0.0"}, "...": "..."},
   "created_at": "2026-02-05T00:00:00Z",
   "updated_at": "2026-02-05T00:00:00Z",
   "tags": {},
@@ -268,8 +282,14 @@ OPENAI_API_KEY=your-key-here
 SERVICE_HOST=0.0.0.0
 SERVICE_PORT=8765
 
-# Database
-DATABASE_URL=sqlite+aiosqlite:///./amplifier.db
+# Database (PostgreSQL)
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=amplifier_dev
+DATABASE_USER=amplifier_dev
+DATABASE_PASSWORD=dev_password
+# Or use a full connection URL:
+# DATABASE_URL=postgresql://user:pass@localhost:5432/amplifier_dev
 
 # Authentication (disabled by default for local dev)
 AUTH_REQUIRED=false                    # Set true for production
@@ -409,7 +429,7 @@ See [docs/TESTING.md](docs/TESTING.md) and [docs/TESTING_AUTHENTICATION.md](docs
 | **Interface** | CLI commands | REST API endpoints |
 | **Usage** | `amplifier run "prompt"` | `curl -X POST /sessions/{id}/messages` |
 | **Dependencies** | Published packages | Local editable forks |
-| **Session storage** | Filesystem (JSONL) | SQLite database |
+| **Session storage** | Filesystem (JSONL) | PostgreSQL database |
 | **Streaming** | Terminal output | Server-Sent Events (SSE) |
 | **Deployment** | Local install | Docker container / web service |
 
@@ -433,7 +453,7 @@ See [docs/TESTING.md](docs/TESTING.md) and [docs/TESTING_AUTHENTICATION.md](docs
 
 ### "Database not connected" error
 
-The database auto-initializes on first request. If you see this error, verify the database path is writable.
+The database auto-initializes on first request. If you see this error, verify your PostgreSQL connection settings in `.env`.
 
 ### "amplifier-core not found" error
 

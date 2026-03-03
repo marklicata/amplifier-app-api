@@ -95,7 +95,7 @@ Lightweight runtime instances that reference a Config:
 
 ## Typical Workflow
 
-1. **Build** a config using your app (validate with `POST /api/configs/validate`)
+1. **Build** a config using your app
 2. **Save** the config → Get config_id
 3. **Create** session(s) from config_id → Get session_id
 4. **Send** messages to session_id → Get AI responses
@@ -111,17 +111,16 @@ Lightweight runtime instances that reference a Config:
 ## API Endpoints
 
 ### Application Management
-- `POST /api/applications` - Register application
-- `GET /api/applications` - List applications
-- `DELETE /api/applications/{id}` - Delete application
+- `POST /applications` - Register application
+- `GET /applications` - List applications
+- `DELETE /applications/{id}` - Delete application
 
 ### Config Management
-- `GET /api/configs` - List configs
-- `POST /api/configs` - Create config
-- `GET /api/configs/{id}` - Get config
-- `PUT /api/configs/{id}` - Update config
-- `DELETE /api/configs/{id}` - Delete config
-- `POST /api/configs/validate` - Validate config (no save)
+- `GET /configs` - List configs
+- `POST /configs` - Create config
+- `GET /configs/{id}` - Get config
+- `PUT /configs/{id}` - Update config
+- `DELETE /configs/{id}` - Delete config
 
 ### Recipe Management
 - `GET /api/recipes` - List recipes (user-specific)
@@ -131,15 +130,17 @@ Lightweight runtime instances that reference a Config:
 - `DELETE /api/recipes/{id}` - Delete recipe
 
 ### Session Management
-- `GET /api/sessions` - List sessions
-- `POST /api/sessions` - Create session
-- `GET /api/sessions/{id}` - Get session
-- `POST /api/sessions/{id}/send` - Send message
-- `DELETE /api/sessions/{id}` - Delete session
+- `GET /sessions` - List sessions
+- `POST /sessions` - Create session
+- `GET /sessions/{id}` - Get session
+- `POST /sessions/{id}/messages` - Send message
+- `POST /sessions/{id}/stream` - Stream response (SSE)
+- `DELETE /sessions/{id}` - Delete session
 
 ### Health & Diagnostics
-- `GET /api/health` - Health check
-- `GET /api/smoke` - Smoke test suite
+- `GET /health` - Health check
+- `GET /smoke-tests/quick` - Quick smoke tests
+- `GET /smoke-tests` - Full smoke test suite
 """,
     version="0.3.0",
     lifespan=lifespan,
