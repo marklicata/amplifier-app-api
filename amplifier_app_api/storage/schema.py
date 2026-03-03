@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS applications (
     settings JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX IF NOT EXISTS idx_applications_api_key_prefix ON applications(api_key_prefix);
+-- Index created by migration below if column doesn't exist yet
 
 DROP TRIGGER IF EXISTS update_applications_updated_at ON applications;
 CREATE TRIGGER update_applications_updated_at
@@ -97,7 +97,7 @@ CREATE TRIGGER update_applications_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 """
 
-# Migration: Add api_key_prefix column if it doesn't exist
+# Migration: Add api_key_prefix column if it doesn't exist, and ensure index
 MIGRATE_APPLICATIONS_ADD_KEY_PREFIX = """
 DO $$
 BEGIN
@@ -106,9 +106,9 @@ BEGIN
         WHERE table_name = 'applications' AND column_name = 'api_key_prefix'
     ) THEN
         ALTER TABLE applications ADD COLUMN api_key_prefix VARCHAR(16);
-        CREATE INDEX IF NOT EXISTS idx_applications_api_key_prefix ON applications(api_key_prefix);
     END IF;
 END $$;
+CREATE INDEX IF NOT EXISTS idx_applications_api_key_prefix ON applications(api_key_prefix);
 """
 
 # Users table - user analytics and metadata tracking
