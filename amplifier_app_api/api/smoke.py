@@ -7,19 +7,11 @@ import subprocess
 import sys
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/smoke-tests", tags=["testing"])
-
-
-# Import app for quick tests
-def _get_app():
-    """Lazy import app to avoid circular dependency."""
-    from ..main import app
-
-    return app
 
 
 @router.get("")
@@ -106,7 +98,7 @@ async def run_smoke_tests(
 
 
 @router.get("/quick")
-async def run_quick_smoke_tests() -> dict[str, Any]:
+async def run_quick_smoke_tests(request: Request) -> dict[str, Any]:
     """Run quick smoke tests (basic health checks only).
 
     This is a lightweight endpoint that runs only the most critical tests
@@ -125,8 +117,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
     try:
         from httpx import ASGITransport, AsyncClient
 
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=request.app), base_url="http://test") as client:
             response = await client.get("/health")
             test_passed = response.status_code == 200
             results["tests"].append(
@@ -162,8 +153,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
 
     # Test 3: Sessions endpoint
     try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=request.app), base_url="http://test") as client:
             response = await client.get("/sessions")
             test_passed = response.status_code == 200
             results["tests"].append({"name": "sessions_endpoint", "passed": test_passed})
@@ -177,8 +167,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
 
     # Test 4: Config endpoint
     try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=request.app), base_url="http://test") as client:
             response = await client.get("/configs")
             test_passed = response.status_code == 200
             results["tests"].append({"name": "config_endpoint", "passed": test_passed})
@@ -192,8 +181,7 @@ async def run_quick_smoke_tests() -> dict[str, Any]:
 
     # Test 5: Applications endpoint (authentication infrastructure)
     try:
-        app = _get_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=request.app), base_url="http://test") as client:
             response = await client.get("/applications")
             test_passed = response.status_code == 200
             results["tests"].append({"name": "applications_endpoint", "passed": test_passed})

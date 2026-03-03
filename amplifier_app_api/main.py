@@ -15,6 +15,7 @@ from .api import (
     health_router,
     recipes_router,
     sessions_router,
+    smoke_router,
 )
 from .config import settings
 from .middleware.auth import AuthMiddleware
@@ -175,10 +176,6 @@ app.include_router(applications_router)
 app.include_router(sessions_router)
 app.include_router(config_router)
 app.include_router(recipes_router)
-
-# Import and register smoke tests router (after app is defined to avoid circular import)
-from .api.smoke import router as smoke_router  # noqa: E402
-
 app.include_router(smoke_router)
 
 

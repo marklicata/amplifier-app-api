@@ -5,6 +5,7 @@ from .config import router as config_router
 from .health import router as health_router
 from .recipes import router as recipes_router
 from .sessions import router as sessions_router
+from .smoke import router as smoke_router
 
 __all__ = [
     "applications_router",
@@ -12,4 +13,5 @@ __all__ = [
     "config_router",
     "recipes_router",
     "health_router",
+    "smoke_router",
 ]
