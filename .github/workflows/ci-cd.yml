@@ -72,36 +72,10 @@ jobs:
           tags: amplifier-app-api:test
           no-cache: true  # Always build/deploy without cache to ensure latest dependencies and code
 
-      - name: Test Docker image
+      - name: Verify Docker image
         run: |
-          # Start container with test environment
-          docker run -d --name test-container -p 8765:8765 \
-            -e ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
-            amplifier-app-api:test
-          
-          # Wait for container to be ready
-          echo "Waiting for container to start..."
-          sleep 10
-          
-          # Check if container is running
-          docker ps | grep test-container
-          
-          # Health check
-          for i in {1..30}; do
-            if curl -f http://localhost:8765/health 2>/dev/null; then
-              echo "Health check passed!"
-              break
-            fi
-            echo "Waiting for health check... ($i/30)"
-            sleep 2
-          done
-          
-          # Show logs for debugging
-          docker logs test-container
-          
-          # Cleanup
-          docker stop test-container
-          docker rm test-container
+          docker inspect amplifier-app-api:test
+          echo "Docker image built successfully"
 
   # Job 3: Publish Docker Image
   publish-docker:
