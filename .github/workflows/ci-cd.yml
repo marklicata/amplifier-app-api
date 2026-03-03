@@ -76,7 +76,7 @@ jobs:
         run: |
           # Start container with test environment
           docker run -d --name test-container -p 8765:8765 \
-            -e ANTHROPIC_API_KEY=test-key-placeholder \
+            -e ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
             amplifier-app-api:test
           
           # Wait for container to be ready
