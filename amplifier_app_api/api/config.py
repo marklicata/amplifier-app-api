@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..core import ConfigManager
+from ..core import ConfigManager, SessionManager
 from ..models import (
     ConfigCreateRequest,
     ConfigListResponse,
@@ -18,10 +18,24 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/configs", tags=["configs"])
 
+# Cached SessionManager instance for cache invalidation
+_session_manager: SessionManager | None = None
+
 
 async def get_config_manager(db: Database = Depends(get_db)) -> ConfigManager:
-    """Dependency to get config manager."""
-    return ConfigManager(db)
+    """Dependency to get config manager with cache invalidation support.
+
+    Uses a shared SessionManager so that config updates properly
+    invalidate cached prepared bundles.
+    """
+    global _session_manager
+    if _session_manager is None:
+        try:
+            _session_manager = SessionManager(db)
+        except RuntimeError:
+            # Amplifier deps not installed — fall back to standalone ConfigManager
+            return ConfigManager(db)
+    return _session_manager.config_manager
 
 
 def get_user_id(request: Request) -> str | None:
