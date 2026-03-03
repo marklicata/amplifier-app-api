@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,10 @@ from ..storage import Database
 from .config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of entries in each cache
+MAX_ACTIVE_SESSIONS = 100
+MAX_PREPARED_BUNDLES = 50
 
 
 class SessionManager:
@@ -23,11 +28,34 @@ class SessionManager:
         self.config_manager = ConfigManager(
             db, session_manager=self
         )  # Pass self for cache invalidation
-        self._sessions: dict[str, Any] = {}  # Active AmplifierSession instances
-        self._prepared_bundles: dict[str, Any] = {}  # Cached prepared bundles by config_id
+        self._sessions: OrderedDict[str, Any] = OrderedDict()  # LRU cache of active sessions
+        self._prepared_bundles: OrderedDict[str, Any] = OrderedDict()  # LRU cache of bundles
 
         # Import amplifier modules (will use installed packages from pyproject.toml)
         self._import_amplifier_modules()
+
+    def _evict_oldest_session(self) -> None:
+        """Evict the oldest session from the cache if at capacity."""
+        while len(self._sessions) >= MAX_ACTIVE_SESSIONS:
+            evicted_id, evicted_session = self._sessions.popitem(last=False)
+            try:
+                # Best-effort cleanup of evicted session
+                if hasattr(evicted_session, "cleanup"):
+                    import asyncio
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(evicted_session.cleanup())
+                    except RuntimeError:
+                        pass
+            except Exception:
+                pass
+            logger.info(f"Evicted session from cache: {evicted_id} (capacity: {MAX_ACTIVE_SESSIONS})")
+
+    def _evict_oldest_bundle(self) -> None:
+        """Evict the oldest prepared bundle from the cache if at capacity."""
+        while len(self._prepared_bundles) >= MAX_PREPARED_BUNDLES:
+            evicted_id, _ = self._prepared_bundles.popitem(last=False)
+            logger.info(f"Evicted bundle from cache: {evicted_id} (capacity: {MAX_PREPARED_BUNDLES})")
 
     def invalidate_config_cache(self, config_id: str) -> None:
         """Invalidate cached prepared bundle for a config.
@@ -226,7 +254,8 @@ class SessionManager:
             )
             logger.info(f"Bundle prepared for config: {config_id}")
 
-            # Cache prepared bundle for reuse
+            # Cache prepared bundle for reuse (with LRU eviction)
+            self._evict_oldest_bundle()
             self._prepared_bundles[config_id] = prepared
             logger.info(f"Bundle cached for config: {config_id}")
 
@@ -284,7 +313,8 @@ class SessionManager:
             is_resumed=False,
         )
 
-        # Store the active session
+        # Store the active session (with LRU eviction)
+        self._evict_oldest_session()
         self._sessions[session_id] = amplifier_session
         logger.info(f"Created AmplifierSession: {session_id}")
 
