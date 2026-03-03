@@ -122,11 +122,12 @@ async def create_session(
 
 @router.get("", response_model=SessionListResponse)
 async def list_sessions(
+    request: Request,
     limit: int = 50,
     offset: int = 0,
     manager: SessionManager = Depends(get_session_manager),
 ) -> SessionListResponse:
-    """List all sessions.
+    """List sessions for the authenticated user.
 
     Args:
         limit: Maximum number of sessions to return
@@ -136,7 +137,8 @@ async def list_sessions(
         SessionListResponse: List of session information
     """
     try:
-        sessions = await manager.list_sessions(limit=limit, offset=offset)
+        user_id = getattr(request.state, "user_id", None)
+        sessions = await manager.list_sessions(limit=limit, offset=offset, user_id=user_id)
 
         session_infos = [
             SessionInfo(
