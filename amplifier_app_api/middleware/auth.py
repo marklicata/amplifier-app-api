@@ -2,10 +2,14 @@
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
+from typing import Any
 
 import bcrypt
+import httpx
 import jwt
+from jwt.algorithms import RSAAlgorithm
 from fastapi import HTTPException, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -16,6 +20,89 @@ logger = logging.getLogger(__name__)
 
 # Cache GitHub username to avoid repeated subprocess calls
 _github_user_cache: str | None = None
+
+# JWKS cache: stores fetched public keys with TTL
+_jwks_cache: dict[str, Any] | None = None
+_jwks_cache_time: float = 0.0
+_JWKS_CACHE_TTL = 3600  # 1 hour
+
+
+async def _fetch_jwks(url: str) -> dict[str, Any]:
+    """Fetch JWKS from the configured endpoint with caching.
+
+    Returns cached keys if within TTL, otherwise fetches fresh keys.
+
+    Args:
+        url: JWKS endpoint URL
+
+    Returns:
+        JWKS response as dict
+
+    Raises:
+        HTTPException: If JWKS fetch fails
+    """
+    global _jwks_cache, _jwks_cache_time
+
+    now = time.monotonic()
+    if _jwks_cache is not None and (now - _jwks_cache_time) < _JWKS_CACHE_TTL:
+        return _jwks_cache
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            jwks = response.json()
+
+        _jwks_cache = jwks
+        _jwks_cache_time = now
+        logger.info(f"Fetched JWKS from {url} ({len(jwks.get('keys', []))} keys)")
+        return jwks
+
+    except Exception as e:
+        logger.error(f"Failed to fetch JWKS from {url}: {e}")
+        # If we have a stale cache, use it rather than failing
+        if _jwks_cache is not None:
+            logger.warning("Using stale JWKS cache after fetch failure")
+            return _jwks_cache
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to fetch JWT public keys from {url}",
+        )
+
+
+def _get_signing_key_from_jwks(jwks: dict[str, Any], token: str) -> str:
+    """Extract the correct signing key from JWKS for the given token.
+
+    Matches the key ID (kid) from the token header against JWKS keys.
+
+    Args:
+        jwks: JWKS response dict
+        token: Raw JWT token string
+
+    Returns:
+        PEM-encoded public key string
+
+    Raises:
+        HTTPException: If no matching key found
+    """
+    try:
+        unverified_header = jwt.get_unverified_header(token)
+    except jwt.JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid JWT header: {e}")
+
+    kid = unverified_header.get("kid")
+    if not kid:
+        raise HTTPException(status_code=401, detail="JWT header missing 'kid' claim")
+
+    for key_data in jwks.get("keys", []):
+        if key_data.get("kid") == kid:
+            public_key = RSAAlgorithm.from_jwk(key_data)
+            return public_key
+
+    raise HTTPException(
+        status_code=401,
+        detail=f"No matching public key found for kid '{kid}'",
+    )
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -220,6 +307,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def _verify_jwt(self, request: Request) -> str:
         """Verify JWT and return user_id.
 
+        For HS256 (dev): verifies with the shared secret key.
+        For RS256 (prod): fetches public keys from JWKS endpoint and verifies signature.
+
         Args:
             request: FastAPI request
 
@@ -239,8 +329,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         token = auth_header.split(" ")[1]
 
         try:
-            # For development: use HS256 with secret key
-            # For production: use RS256 with public key from JWKS endpoint
             if settings.jwt_algorithm == "HS256":
                 payload = jwt.decode(
                     token,
@@ -248,20 +336,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     algorithms=["HS256"],
                 )
             else:
-                # RS256: Fetch public key from JWKS endpoint
-                # (Simplified - in production use proper JWKS fetching with caching)
+                # RS256: Verify signature with public key from JWKS endpoint
                 if not settings.jwt_public_key_url:
                     raise HTTPException(
                         status_code=500,
                         detail="JWT public key URL not configured for RS256",
                     )
 
-                # For now, just decode without verification for RS256
-                # Production: Implement proper JWKS public key fetching with caching
+                jwks = await _fetch_jwks(settings.jwt_public_key_url)
+                public_key = _get_signing_key_from_jwks(jwks, token)
+
+                decode_options = {}
+                if settings.jwt_audience:
+                    decode_options["audience"] = settings.jwt_audience
+
                 payload = jwt.decode(
                     token,
-                    options={"verify_signature": False},
+                    public_key,
                     algorithms=["RS256"],
+                    issuer=settings.jwt_issuer if settings.jwt_issuer else None,
+                    options=decode_options,
                 )
 
             # Extract user_id from 'sub' claim
@@ -269,13 +363,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not user_id:
                 raise HTTPException(status_code=401, detail="JWT missing 'sub' claim (user_id)")
 
-            # Verify issuer if configured
-            if settings.jwt_issuer and payload.get("iss") != settings.jwt_issuer:
-                raise HTTPException(status_code=401, detail="Invalid JWT issuer")
-
-            # Verify audience if configured
-            if settings.jwt_audience and payload.get("aud") != settings.jwt_audience:
-                raise HTTPException(status_code=401, detail="Invalid JWT audience")
+            # Verify issuer if configured (for HS256 where it's not passed to decode)
+            if settings.jwt_algorithm == "HS256":
+                if settings.jwt_issuer and payload.get("iss") != settings.jwt_issuer:
+                    raise HTTPException(status_code=401, detail="Invalid JWT issuer")
+                if settings.jwt_audience and payload.get("aud") != settings.jwt_audience:
+                    raise HTTPException(status_code=401, detail="Invalid JWT audience")
 
             return user_id
 
@@ -308,7 +401,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if settings.jwt_algorithm == "HS256":
             payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
         else:
-            payload = jwt.decode(token, options={"verify_signature": False}, algorithms=["RS256"])
+            # Token already verified in _verify_jwt; safe to decode claims without re-verifying
+            # since we validated the signature above
+            jwks = await _fetch_jwks(settings.jwt_public_key_url)
+            public_key = _get_signing_key_from_jwks(jwks, token)
+            payload = jwt.decode(token, public_key, algorithms=["RS256"])
 
         app_id = payload.get("app_id")
         if not app_id:
