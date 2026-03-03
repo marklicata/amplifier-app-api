@@ -191,7 +191,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not api_key:
             raise HTTPException(status_code=401, detail=f"Missing {settings.api_key_header} header")
 
-        # Get database connection - use global instance for tests
+        # Get database connection
         from ..storage.database import get_db
 
         try:
@@ -201,13 +201,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             raise HTTPException(status_code=503, detail="Database not available")
 
         # Look up application by API key
-        if not db._pool:
-            raise HTTPException(status_code=503, detail="Database not available")
-
-        async with db._pool.acquire() as conn:
-            applications = await conn.fetch(
-                "SELECT app_id, api_key_hash, is_active FROM applications"
-            )
+        applications = await db.find_application_by_api_key_hash()
 
         for app in applications:
             # Verify the API key against stored hash

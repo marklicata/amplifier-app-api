@@ -672,6 +672,125 @@ class Database:
 
         logger.debug(f"Ensured user exists: {user_id}")
 
+    # Application operations
+    async def create_application(
+        self,
+        app_id: str,
+        app_name: str,
+        api_key_hash: str,
+    ) -> datetime:
+        """Create a new application.
+
+        Returns:
+            Created timestamp
+        """
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        now = datetime.now(UTC)
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO applications
+                (app_id, app_name, api_key_hash, is_active, created_at, updated_at, settings)
+                VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+                """,
+                app_id,
+                app_name,
+                api_key_hash,
+                True,
+                now,
+                now,
+                "{}",
+            )
+
+        logger.debug(f"Created application: {app_id}")
+        return now
+
+    async def get_application(self, app_id: str) -> dict[str, Any] | None:
+        """Get application by app_id."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT app_id, app_name, is_active, created_at, updated_at FROM applications WHERE app_id = $1",
+                app_id,
+            )
+
+        if row:
+            return dict(row)
+        return None
+
+    async def application_exists(self, app_id: str) -> bool:
+        """Check if an application exists."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            existing = await conn.fetchval(
+                "SELECT app_id FROM applications WHERE app_id = $1", app_id
+            )
+
+        return existing is not None
+
+    async def list_applications(self) -> list[dict[str, Any]]:
+        """List all registered applications."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT app_id, app_name, is_active, created_at, updated_at
+                FROM applications
+                ORDER BY created_at DESC
+                """
+            )
+
+        return [dict(row) for row in rows]
+
+    async def delete_application(self, app_id: str) -> bool:
+        """Delete an application. Returns True if it existed."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM applications WHERE app_id = $1", app_id
+            )
+
+        deleted = result.split()[-1] != "0" if result else False
+        if deleted:
+            logger.debug(f"Deleted application: {app_id}")
+        return deleted
+
+    async def update_application_key(self, app_id: str, api_key_hash: str) -> None:
+        """Update an application's API key hash."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE applications SET api_key_hash = $1, updated_at = NOW() WHERE app_id = $2",
+                api_key_hash,
+                app_id,
+            )
+
+        logger.debug(f"Updated API key for application: {app_id}")
+
+    async def find_application_by_api_key_hash(self) -> list[dict[str, Any]]:
+        """Get all applications with their key hashes for verification."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT app_id, api_key_hash, is_active FROM applications"
+            )
+
+        return [dict(row) for row in rows]
+
 
 # Global database instance
 _db: Database | None = None
