@@ -19,7 +19,11 @@ class Settings(BaseSettings):
     # Service settings
     service_host: str = Field(default="0.0.0.0", description="Host to bind the service")
     service_port: int = Field(default=8765, description="Port to bind the service")
-    service_workers: int = Field(default=4, description="Number of worker processes")
+    service_workers: int = Field(
+        default=1,
+        description="Number of worker processes. Must be 1 because active sessions "
+        "are stored in-process memory. Use async concurrency for parallelism.",
+    )
     log_level: str = Field(default="info", description="Logging level")
 
     # Database - PostgreSQL connection
