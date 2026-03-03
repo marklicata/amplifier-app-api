@@ -136,11 +136,12 @@ async def create_config(
 
 @router.get("", response_model=ConfigListResponse)
 async def list_configs(
+    http_request: Request,
     limit: int = 50,
     offset: int = 0,
     manager: ConfigManager = Depends(get_config_manager),
 ) -> ConfigListResponse:
-    """List all configs.
+    """List configs for the authenticated user.
 
     Args:
         limit: Maximum number of configs to return
@@ -150,7 +151,8 @@ async def list_configs(
         ConfigListResponse: List of config metadata
     """
     try:
-        configs, total = await manager.list_configs(limit=limit, offset=offset)
+        user_id = get_user_id(http_request)
+        configs, total = await manager.list_configs(limit=limit, offset=offset, user_id=user_id)
 
         return ConfigListResponse(configs=configs, total=total)
     except Exception as e:

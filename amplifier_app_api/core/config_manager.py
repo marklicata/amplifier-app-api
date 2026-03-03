@@ -250,18 +250,19 @@ class ConfigManager:
         return True
 
     async def list_configs(
-        self, limit: int = 50, offset: int = 0
+        self, limit: int = 50, offset: int = 0, user_id: str | None = None
     ) -> tuple[list[ConfigMetadata], int]:
-        """List all configs.
+        """List configs, optionally filtered by user_id.
 
         Args:
             limit: Maximum number of configs to return
             offset: Offset for pagination
+            user_id: If provided, only return configs owned by this user
 
         Returns:
             Tuple of (list of ConfigMetadata, total count)
         """
-        configs_data = await self.db.list_configs(limit=limit, offset=offset)
+        configs_data = await self.db.list_configs(limit=limit, offset=offset, user_id=user_id)
         total = await self.db.count_configs()
 
         configs = [

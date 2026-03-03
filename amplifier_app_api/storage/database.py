@@ -124,23 +124,35 @@ class Database:
             }
         return None
 
-    async def list_sessions(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """List all sessions."""
+    async def list_sessions(
+        self, limit: int = 50, offset: int = 0, user_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List sessions, optionally filtered by user_id."""
         if not self._pool:
             raise RuntimeError("Database not connected")
 
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
+        if user_id:
+            query = """
+                SELECT session_id, config_id, owner_user_id, status,
+                       created_at, updated_at, message_count
+                FROM sessions
+                WHERE owner_user_id = $1
+                ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
+            """
+            params = [user_id, limit, offset]
+        else:
+            query = """
                 SELECT session_id, config_id, owner_user_id, status,
                        created_at, updated_at, message_count
                 FROM sessions
                 ORDER BY updated_at DESC
                 LIMIT $1 OFFSET $2
-                """,
-                limit,
-                offset,
-            )
+            """
+            params = [limit, offset]
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
 
         return [
             {
@@ -403,22 +415,33 @@ class Database:
 
         logger.debug(f"Deleted config: {config_id}")
 
-    async def list_configs(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """List all configs."""
+    async def list_configs(
+        self, limit: int = 50, offset: int = 0, user_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List configs, optionally filtered by user_id."""
         if not self._pool:
             raise RuntimeError("Database not connected")
 
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
+        if user_id:
+            query = """
+                SELECT config_id, name, description, user_id, created_at, updated_at, tags
+                FROM configs
+                WHERE user_id = $1
+                ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
+            """
+            params = [user_id, limit, offset]
+        else:
+            query = """
                 SELECT config_id, name, description, user_id, created_at, updated_at, tags
                 FROM configs
                 ORDER BY updated_at DESC
                 LIMIT $1 OFFSET $2
-                """,
-                limit,
-                offset,
-            )
+            """
+            params = [limit, offset]
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
 
         return [
             {

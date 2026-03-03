@@ -332,9 +332,11 @@ class SessionManager:
             transcript=session_data["transcript"],
         )
 
-    async def list_sessions(self, limit: int = 50, offset: int = 0) -> list[Session]:
-        """List all sessions."""
-        sessions_data = await self.db.list_sessions(limit=limit, offset=offset)
+    async def list_sessions(
+        self, limit: int = 50, offset: int = 0, user_id: str | None = None
+    ) -> list[Session]:
+        """List sessions, optionally filtered by user_id."""
+        sessions_data = await self.db.list_sessions(limit=limit, offset=offset, user_id=user_id)
         return [
             Session(
                 session_id=s["session_id"],
