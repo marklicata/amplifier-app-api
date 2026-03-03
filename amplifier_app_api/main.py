@@ -57,6 +57,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "another. Set service_workers=1 to avoid random 404 errors."
         )
 
+    # Validate security settings before proceeding
+    settings.validate_security()
+
     # Initialize telemetry
     initialize_telemetry()
     logger.info("Telemetry initialized")
