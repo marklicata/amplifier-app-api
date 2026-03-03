@@ -442,7 +442,6 @@ class Database:
 
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(query, *params)
-            )
 
         return [
             {
