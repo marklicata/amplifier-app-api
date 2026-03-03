@@ -701,6 +701,7 @@ class Database:
         app_id: str,
         app_name: str,
         api_key_hash: str,
+        api_key_prefix: str | None = None,
     ) -> datetime:
         """Create a new application.
 
@@ -715,12 +716,13 @@ class Database:
             await conn.execute(
                 """
                 INSERT INTO applications
-                (app_id, app_name, api_key_hash, is_active, created_at, updated_at, settings)
-                VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+                (app_id, app_name, api_key_hash, api_key_prefix, is_active, created_at, updated_at, settings)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
                 """,
                 app_id,
                 app_name,
                 api_key_hash,
+                api_key_prefix,
                 True,
                 now,
                 now,
@@ -788,28 +790,49 @@ class Database:
             logger.debug(f"Deleted application: {app_id}")
         return deleted
 
-    async def update_application_key(self, app_id: str, api_key_hash: str) -> None:
-        """Update an application's API key hash."""
+    async def update_application_key(self, app_id: str, api_key_hash: str, api_key_prefix: str | None = None) -> None:
+        """Update an application's API key hash and optional prefix."""
         if not self._pool:
             raise RuntimeError("Database not connected")
 
         async with self._pool.acquire() as conn:
             await conn.execute(
-                "UPDATE applications SET api_key_hash = $1, updated_at = NOW() WHERE app_id = $2",
+                "UPDATE applications SET api_key_hash = $1, api_key_prefix = $2, updated_at = NOW() WHERE app_id = $3",
                 api_key_hash,
+                api_key_prefix,
                 app_id,
             )
 
         logger.debug(f"Updated API key for application: {app_id}")
 
-    async def find_application_by_api_key_hash(self) -> list[dict[str, Any]]:
-        """Get all applications with their key hashes for verification."""
+    async def find_applications_by_key_prefix(self, prefix: str) -> list[dict[str, Any]]:
+        """Find applications matching an API key prefix for O(1) lookup.
+
+        Args:
+            prefix: The first 12 chars of the API key
+
+        Returns:
+            List of matching applications with their key hashes
+        """
         if not self._pool:
             raise RuntimeError("Database not connected")
 
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT app_id, api_key_hash, is_active FROM applications"
+                "SELECT app_id, api_key_hash, is_active FROM applications WHERE api_key_prefix = $1",
+                prefix,
+            )
+
+        return [dict(row) for row in rows]
+
+    async def find_all_applications_for_key_check(self) -> list[dict[str, Any]]:
+        """Fallback: get all applications for key verification (legacy keys without prefix)."""
+        if not self._pool:
+            raise RuntimeError("Database not connected")
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT app_id, api_key_hash, is_active FROM applications WHERE api_key_prefix IS NULL"
             )
 
         return [dict(row) for row in rows]
