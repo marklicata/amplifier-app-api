@@ -38,7 +38,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/docs",
         "/redoc",
         "/openapi.json",
-        "/applications",  # Need to register to get API keys!
     ]
 
     @staticmethod
@@ -120,10 +119,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """Process request through authentication."""
         # Skip auth for public endpoints
         if request.url.path in self.PUBLIC_PATHS:
-            return await call_next(request)
-
-        # Allow all /applications paths (need to register to get API keys!)
-        if request.url.path.startswith("/applications"):
             return await call_next(request)
 
         # Skip auth if not required (dev mode)
