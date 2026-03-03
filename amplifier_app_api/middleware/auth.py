@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import subprocess
 from collections.abc import Callable
 
 import bcrypt
