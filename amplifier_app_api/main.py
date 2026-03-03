@@ -4,7 +4,7 @@ import logging
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from importlib.metadata import version as pkg_version
+from importlib.metadata import PackageNotFoundError, version as pkg_version
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +21,15 @@ from .config import settings
 from .middleware.auth import AuthMiddleware
 from .storage import init_database
 from .telemetry import TelemetryMiddleware, flush_telemetry, initialize_telemetry
+
+
+def _get_version() -> str:
+    """Get package version, with fallback for development installs."""
+    try:
+        return pkg_version("amplifier-app-api")
+    except PackageNotFoundError:
+        return "0.0.0-dev"
+
 
 # Configure logging
 logging.basicConfig(
@@ -141,7 +150,7 @@ Lightweight runtime instances that reference a Config:
 - `GET /api/health` - Health check
 - `GET /api/smoke` - Smoke test suite
 """,
-    version=pkg_version("amplifier-app-api"),
+    version=_get_version(),
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
