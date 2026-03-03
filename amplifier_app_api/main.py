@@ -39,6 +39,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Service version: {app.version}")
     logger.info(f"Host: {settings.service_host}:{settings.service_port}")
 
+    if settings.service_workers > 1:
+        logger.warning(
+            f"service_workers={settings.service_workers} but active sessions are stored "
+            "in-process memory. Sessions created on one worker will not be available on "
+            "another. Set service_workers=1 to avoid random 404 errors."
+        )
+
     # Initialize telemetry
     initialize_telemetry()
     logger.info("Telemetry initialized")
