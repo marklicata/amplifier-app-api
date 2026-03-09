@@ -19,6 +19,21 @@ MAX_ACTIVE_SESSIONS = 100
 MAX_PREPARED_BUNDLES = 50
 
 
+def _make_json_safe(obj: Any) -> Any:
+    """Recursively convert an object to a JSON-serializable form."""
+    if isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    if isinstance(obj, dict):
+        return {k: _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_make_json_safe(item) for item in obj]
+    if hasattr(obj, "model_dump"):
+        return _make_json_safe(obj.model_dump())
+    if hasattr(obj, "__dict__"):
+        return {k: _make_json_safe(v) for k, v in obj.__dict__.items() if not k.startswith("_")}
+    return str(obj)
+
+
 class SessionManager:
     """Manages Amplifier sessions using amplifier-core."""
 
@@ -453,11 +468,12 @@ class SessionManager:
                     {"role": "assistant", "content": response_text},
                 ]
 
-            # Update database
+            # Update database (sanitize transcript to ensure JSON serializability)
+            safe_transcript = _make_json_safe(transcript)
             await self.db.update_session(
                 session_id=session_id,
-                transcript=transcript,
-                message_count=len([m for m in transcript if m.get("role") == "user"]),
+                transcript=safe_transcript,
+                message_count=len([m for m in safe_transcript if m.get("role") == "user"]),
             )
 
             return {
@@ -627,14 +643,15 @@ class SessionManager:
                 "content": response_text,
             }
 
-            # Update database with final transcript
+            # Update database with final transcript (sanitize for JSON serializability)
             context_manager = amplifier_session.coordinator.get("context")
             if context_manager and hasattr(context_manager, "get_messages"):
                 transcript = await context_manager.get_messages()
+                safe_transcript = _make_json_safe(transcript)
                 await self.db.update_session(
                     session_id=session_id,
-                    transcript=transcript,
-                    message_count=len([m for m in transcript if m.get("role") == "user"]),
+                    transcript=safe_transcript,
+                    message_count=len([m for m in safe_transcript if m.get("role") == "user"]),
                 )
 
         except Exception as e:
