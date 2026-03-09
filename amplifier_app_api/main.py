@@ -1,7 +1,22 @@
 """Main FastAPI application for Amplifier service."""
 
+import json
 import logging
 import sys
+
+# Patch the global JSON encoder so Pydantic models (e.g. amplifier-core's Usage)
+# are serializable everywhere — including inside amplifier module hooks and loop code
+# that calls json.dumps without a custom encoder.
+_original_json_default = json.JSONEncoder.default
+
+
+def _pydantic_aware_default(self, obj):  # type: ignore[override]
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    return _original_json_default(self, obj)
+
+
+json.JSONEncoder.default = _pydantic_aware_default
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version as pkg_version

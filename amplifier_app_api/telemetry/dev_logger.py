@@ -52,7 +52,7 @@ def log_dev_event(event_name: str, properties: dict[str, Any]) -> None:
     }
 
     # Calculate size
-    event_json = json.dumps(event)
+    event_json = json.dumps(event, default=str)
     event_size = len(event_json.encode("utf-8"))
 
     # Check if we need to rotate due to size
